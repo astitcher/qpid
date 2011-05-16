@@ -109,6 +109,58 @@ static class TCPIOPlugin : public Plugin {
     }
 } tcpPlugin;
 
+// Unix domain sockets are only supported on Unix variants
+#ifdef __unix__
+
+// Hack in Unix domain socket at fixed filename - make this
+// configurable by autoconfig/cmake
+#define QPID_UNIXDOMAIN_SOCKET "/tmp/qpid"
+struct SocketConnectOptions :public Options {
+    std::string socketPath;
+
+    SocketConnectOptions() :
+    Options("Unix Domain Socket Options"),
+            socketPath(QPID_UNIXDOMAIN_SOCKET)
+            {
+                addOptions()
+                ("socket-path", optValue(socketPath, "PATH"), "Path to unix domain socket");
+            }
+};
+
+static class UnixIOPlugin : public Plugin {
+    SocketConnectOptions socketOptions;
+
+    Options* getOptions() {
+        return &socketOptions;
+    }
+
+    void earlyInitialize(Target&) {
+    }
+
+    void initialize(Target& target) {
+        broker::Broker* broker = dynamic_cast<broker::Broker*>(&target);
+        // Only provide to a Broker
+        if (broker) {
+            const broker::Broker::Options& opts = broker->getOptions();
+            broker->addFinalizer(boost::bind(&UnixIOPlugin::finalise, this));
+
+            // Need to delete the socket file first
+            ::unlink(socketOptions.socketPath.c_str());
+
+            ProtocolFactory::shared_ptr protocolu(
+                new AsynchIOProtocolFactory(
+                    socketOptions.socketPath, "", opts.connectionBacklog, false));
+            QPID_LOG(notice, "Listening on Unix domain socket " << socketOptions.socketPath);
+            broker->registerProtocolFactory("unix", protocolu);
+        }
+    }
+
+    void finalise() {
+        ::unlink(socketOptions.socketPath.c_str());
+    }
+} unixPlugin;
+#endif // __unix__
+
 AsynchIOProtocolFactory::AsynchIOProtocolFactory(const std::string& host, const std::string& port,
                                                  int backlog, bool nodelay,
                                                  Timer& timer, uint32_t maxTime,
