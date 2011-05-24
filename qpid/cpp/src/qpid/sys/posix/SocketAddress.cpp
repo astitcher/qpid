@@ -59,7 +59,13 @@ SocketAddress& SocketAddress::operator=(const SocketAddress& sa)
 SocketAddress::~SocketAddress()
 {
     if (addrInfo) {
-        ::freeaddrinfo(addrInfo);
+        // If it's a Unix domain socket we made it ourselves'
+        if (addrInfo->ai_family==AF_UNIX) {
+            delete addrInfo->ai_addr;
+            delete addrInfo;
+        } else {
+            ::freeaddrinfo(addrInfo);
+        }
     }
 }
 
@@ -76,6 +82,15 @@ std::string SocketAddress::asString(::sockaddr const * const addr, size_t addrle
     switch (addr->sa_family) {
         case AF_INET: s += dispName; break;
         case AF_INET6: s += "["; s += dispName; s+= "]"; break;
+        case AF_UNIX:
+            // If we're looking up an anonymous endpoint make a fake name
+            if (addrlen == sizeof(addr.sa_family)) {
+                static int count = 0;
+                return boost::lexical_cast<std::string>(count++);
+            } else {
+                int fname_len = addrlen-sizeof(addr.sa_family)-1;
+                return std::string(addr.sa_data, fname_len);
+            }
         default: throw Exception(QPID_MSG("Unexpected socket type"));
     }
     s += ":";
@@ -94,6 +109,9 @@ uint16_t SocketAddress::getPort(::sockaddr const * const addr)
 
 std::string SocketAddress::asString(bool numeric) const
 {
+    if (host[0] == '/')
+        return host;
+
     if (!numeric)
         return host + ":" + port;
     // Canonicalise into numeric id
@@ -128,23 +146,35 @@ void SocketAddress::setAddrInfoPort(uint16_t port) {
 const ::addrinfo& getAddrInfo(const SocketAddress& sa)
 {
     if (!sa.addrInfo) {
-        ::addrinfo hints;
-        ::memset(&hints, 0, sizeof(hints));
-        hints.ai_flags = AI_ADDRCONFIG; // Only use protocols that we have configured interfaces for
-        hints.ai_family = AF_UNSPEC; // Allow both IPv4 and IPv6
-        hints.ai_socktype = SOCK_STREAM;
-
-        const char* node = 0;
-        if (sa.host.empty()) {
-            hints.ai_flags |= AI_PASSIVE;
+        // Special hack to support Unix domain sockets
+        if (sa.host[0] == '/') {
+            sa.addrInfo = new ::addrinfo;
+            sa.addrInfo->ai_family = AF_UNIX;
+            sa.addrInfo->ai_socktype = SOCK_STREAM;
+            sa.addrInfo->ai_addr = (::sockaddr*) new ::sockaddr_storage;
+            ::memset(sa.addrInfo->ai_addr, 0, sizeof(::sockaddr_storage));
+            sa.addrInfo->ai_addr->sa_family = AF_UNIX;
+            ::memcpy(sa.addrInfo->ai_addr->sa_data, sa.host.c_str(), sa.host.size());
+            sa.addrInfo->ai_addrlen = sizeof(sa.addrInfo->ai_addr->sa_family)+sa.host.size();
         } else {
-            node = sa.host.c_str();
-        }
-        const char* service = sa.port.empty() ? "0" : sa.port.c_str();
+            ::addrinfo hints;
+            ::memset(&hints, 0, sizeof(hints));
+            hints.ai_flags = AI_ADDRCONFIG; // Only use protocols that we have configured interfaces for
+            hints.ai_family = AF_UNSPEC; // Allow both IPv4 and IPv6
+            hints.ai_socktype = SOCK_STREAM;
 
-        int n = ::getaddrinfo(node, service, &hints, &sa.addrInfo);
-        if (n != 0)
-            throw Exception(QPID_MSG("Cannot resolve " << sa.asString(false) << ": " << ::gai_strerror(n)));
+            const char* node = 0;
+            if (sa.host.empty()) {
+                hints.ai_flags |= AI_PASSIVE;
+            } else {
+                node = sa.host.c_str();
+            }
+            const char* service = sa.port.empty() ? "0" : sa.port.c_str();
+
+            int n = ::getaddrinfo(node, service, &hints, &sa.addrInfo);
+            if (n != 0)
+                throw Exception(QPID_MSG("Cannot resolve " << sa.asString(false) << ": " << ::gai_strerror(n)));
+        }
         sa.currentAddrInfo = sa.addrInfo;
     }
 
