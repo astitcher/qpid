@@ -43,6 +43,12 @@ except ImportError:
       self.sock.close()
 
 def connect(host, port):
+  # decide between unix domain socket and IP socket
+  if host[0] == '/':
+    sock = socket.socket(socket.AF_UNIX)
+    sock.connect(host)
+    return sock
+
   for res in socket.getaddrinfo(host, port, 0, socket.SOCK_STREAM):
     af, socktype, proto, canonname, sa = res
     sock = socket.socket(af, socktype, proto)
@@ -111,7 +117,7 @@ class URL:
 
   RE = re.compile(r"""
         # [   <scheme>://  ] [    <user>   [   / <password>   ] @]    ( <host4>     | \[    <host6>    \] )  [   :<port>   ]
-        ^ (?: ([^:/@]+)://)? (?: ([^:/@]+) (?: / ([^:/@]+)   )? @)? (?: ([^@:/\[]+) | \[ ([a-f0-9:.]+) \] ) (?: :([0-9]+))?$
+        ^ (?: ([^:/@]+)://)? (?: ([^:/@]+) (?: / ([^:/@]+)   )? @)? (?: ([^@:\[]+) | \[ ([a-f0-9:.]+) \] ) (?: :([0-9]+))?$
 """, re.X | re.I)
 
   AMQPS = "amqps"
