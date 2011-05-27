@@ -112,9 +112,6 @@ static class TCPIOPlugin : public Plugin {
 // Unix domain sockets are only supported on Unix variants
 #ifdef __unix__
 
-// Hack in Unix domain socket at fixed filename - make this
-// configurable by autoconfig/cmake
-#define QPID_UNIXDOMAIN_SOCKET "/tmp/qpid"
 struct SocketConnectOptions :public Options {
     std::string socketPath;
 
