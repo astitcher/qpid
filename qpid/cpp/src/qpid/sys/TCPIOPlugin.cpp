@@ -33,6 +33,11 @@
 #include <boost/bind.hpp>
 #include <boost/ptr_container/ptr_vector.hpp>
 
+// For mkdir (used only by Unix domain sockets)
+#ifdef __unix
+#include <sys/stat.h>
+#endif
+
 namespace qpid {
 namespace sys {
 
@@ -113,19 +118,23 @@ static class TCPIOPlugin : public Plugin {
 #ifdef __unix__
 
 struct SocketConnectOptions :public Options {
-    std::string socketPath;
+    std::string socketDir;
+    std::string socketName;
 
     SocketConnectOptions() :
     Options("Unix Domain Socket Options"),
-            socketPath(QPID_UNIXDOMAIN_SOCKET)
+            socketDir(QPID_SOCKET_DIR),
+            socketName(QPID_SOCKET_NAME)
             {
                 addOptions()
-                ("socket-path", optValue(socketPath, "PATH"), "Path to unix domain socket");
+                ("socket-dir", optValue(socketDir, "DIR"), "Path to unix domain socket directory")
+                ("socket-name", optValue(socketName, "NAME"), "Name of unix domain socket");
             }
 };
 
 static class UnixIOPlugin : public Plugin {
     SocketConnectOptions socketOptions;
+    std::string path;
 
     Options* getOptions() {
         return &socketOptions;
@@ -139,21 +148,32 @@ static class UnixIOPlugin : public Plugin {
         // Only provide to a Broker
         if (broker) {
             const broker::Broker::Options& opts = broker->getOptions();
-            broker->addFinalizer(boost::bind(&UnixIOPlugin::finalise, this));
+
+            // Ensure that the socket directory exists
+            int rc = ::mkdir(socketOptions.socketDir.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+            if (rc==-1 && errno!=EEXIST) {
+                QPID_LOG(warning, "Unable to create Unix domain socket directory "
+                    << socketOptions.socketDir
+                    << ": " << strError(errno));
+                return;
+            }
 
             // Need to delete the socket file first
-            ::unlink(socketOptions.socketPath.c_str());
+            path = socketOptions.socketDir + "/" + socketOptions.socketName;
+            ::unlink(path.c_str());
 
             ProtocolFactory::shared_ptr protocolu(
                 new AsynchIOProtocolFactory(
-                    socketOptions.socketPath, "", opts.connectionBacklog, false));
-            QPID_LOG(notice, "Listening on Unix domain socket " << socketOptions.socketPath);
+                    socketOptions.socketDir, socketOptions.socketName, opts.connectionBacklog, false));
+            QPID_LOG(notice, "Listening on Unix domain socket " << path);
             broker->registerProtocolFactory("unix", protocolu);
+
+            broker->addFinalizer(boost::bind(&UnixIOPlugin::finalise, this));
         }
     }
 
     void finalise() {
-        ::unlink(socketOptions.socketPath.c_str());
+        ::unlink(socketOptions.socketDir.c_str());
     }
 } unixPlugin;
 #endif // __unix__

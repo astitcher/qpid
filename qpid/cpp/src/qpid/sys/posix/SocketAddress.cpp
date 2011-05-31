@@ -104,13 +104,24 @@ uint16_t SocketAddress::getPort(::sockaddr const * const addr)
         case AF_INET: return ntohs(((const ::sockaddr_in*)(const void*)addr)->sin_port);
         case AF_INET6: return ntohs(((const ::sockaddr_in6*)(const void*)addr)->sin6_port);
         default:throw Exception(QPID_MSG("Unexpected socket type"));
+}
+
+namespace {
+    // If the port left at default or empty use the default socket file name
+    inline std::string socketfilename(const std::string& host, const std::string& port) {
+        if (port.empty() || port == "5672") {
+            return host + "/" QPID_SOCKET_NAME;
+        } else {
+            return host + "/" + port;
+        }
     }
 }
 
 std::string SocketAddress::asString(bool numeric) const
 {
+    // Unix domain socket
     if (host[0] == '/')
-        return host;
+        return socketfilename(host, port);
 
     if (!numeric)
         return host + ":" + port;
@@ -154,8 +165,9 @@ const ::addrinfo& getAddrInfo(const SocketAddress& sa)
             sa.addrInfo->ai_addr = (::sockaddr*) new ::sockaddr_storage;
             ::memset(sa.addrInfo->ai_addr, 0, sizeof(::sockaddr_storage));
             sa.addrInfo->ai_addr->sa_family = AF_UNIX;
-            ::memcpy(sa.addrInfo->ai_addr->sa_data, sa.host.c_str(), sa.host.size());
-            sa.addrInfo->ai_addrlen = sizeof(sa.addrInfo->ai_addr->sa_family)+sa.host.size();
+            std::string path(socketfilename(sa.host, sa.port));
+            ::memcpy(sa.addrInfo->ai_addr->sa_data, path.c_str(), path.size());
+            sa.addrInfo->ai_addrlen = sizeof(sa.addrInfo->ai_addr->sa_family)+path.size();
         } else {
             ::addrinfo hints;
             ::memset(&hints, 0, sizeof(hints));

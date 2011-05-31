@@ -139,16 +139,18 @@ tmoduleexecdir = $(libdir)/qpid/tests
 tmoduleexec_LTLIBRARIES=
 
 #
-# Default location for unix domain socket used for local client-broker comms
+# Default name and location for unix domain socket used for local client-broker comms
 #
-qpidsocket = $(localstatedir)/run/qpid
+qpidsocketdir = /tmp/qpid
+qpidsocketname = amqp
 
 AM_CXXFLAGS += -DBOOST_FILESYSTEM_VERSION=2
 
 ## Automake macros to build libraries and executables.
 qpidd_CXXFLAGS = $(AM_CXXFLAGS) -DQPIDD_MODULE_DIR=\"$(dmoduleexecdir)\" -DQPIDD_CONF_FILE=\"$(sysconfdir)/qpidd.conf\" -DQPIDC_CONF_FILE=\"$(confdir)/qpidc.conf\"
-libqpidbroker_la_CXXFLAGS = $(AM_CXXFLAGS) -DQPID_UNIXDOMAIN_SOCKET=\"$(qpidsocket)\"
+libqpidbroker_la_CXXFLAGS = $(AM_CXXFLAGS) -DQPID_SOCKET_DIR=\"$(qpidsocketdir)\" -DQPID_SOCKET_NAME=\"$(qpidsocketname)\"
 libqpidclient_la_CXXFLAGS = $(AM_CXXFLAGS) -DQPIDC_MODULE_DIR=\"$(cmoduleexecdir)\" -DQPIDC_CONF_FILE=\"$(confdir)/qpidc.conf\"
+libqpidcommon_la_CXXFLAGS = $(AM_CXXFLAGS) -DQPID_SOCKET_DIR=\"$(qpidsocketdir)\" -DQPID_SOCKET_NAME=\"$(qpidsocketname)\"
 
 qpidd_LDADD =					\
   libqpidbroker.la				\
