@@ -381,6 +381,47 @@ AC_ARG_WITH([rdma],
 LIBS=$tmp_LIBS
 AM_CONDITIONAL([RDMA], [test x$with_RDMA = xyes])
 
+# Check for Unix domain sockets
+AC_ARG_ENABLE([unix-domain-socket],
+  [AS_HELP_STRING([--enable-unix-domain-socket], [Build with support for unix domain socket transport])],
+  [case "${enableval}" in
+   yes)
+     AC_CHECK_DECL([AF_UNIX],, [AC_MSG_ERROR([AF_UNIX not found])], [[#include <sys/socket.h>]])
+     ;;
+   no) ;;
+   *)  AC_MSG_ERROR([Bad value for --enable-unix-domain-socket option: ${enableval}]) ;;
+  esac],
+  [
+   enableval="yes"
+   AC_CHECK_DECL([AF_UNIX],, [enableval="no"], [[#include <sys/socket.h>]])
+  ]
+)
+
+# If we're configuring unix domain sockets allow the default location and name to be changed
+if test x${enableval} = xyes; then
+  socket_dir="/tmp/qpid"
+  AC_ARG_WITH([socketdir],
+    [AS_HELP_STRING([--with-socketdir], [The directory for unix domain sockets])],
+    [case "${withval}" in
+     yes) ;;
+     no) AC_MSG_ERROR([Bad value for --with-socketdir: ${withval} (Use --disable-unix-domain-socket)]);;
+     *) socket_dir=$withval;;
+    esac]
+  )
+  socket_name="amqp"
+  AC_ARG_WITH([socketname],
+    [AS_HELP_STRING([--with-socketname], [Default filename for unix domain socket])],
+    [case "${withval}" in
+     yes) ;;
+     no) AC_MSG_ERROR([Bad value for --with-socketname: ${withval} (Use --disable-unix-domain-socket)]);;
+     *) socket_name=$withval ;;
+    esac]
+  )
+  AC_DEFINE([HAVE_UNIX_DOMAIN], [1], [Define to 1 to enable unix domain sockets])
+  AC_DEFINE_UNQUOTED([QPID_SOCKET_DIR],["${socket_dir}"],[Default directory for unix domain sockets])
+  AC_DEFINE_UNQUOTED([QPID_SOCKET_NAME],["${socket_name}"],[Default name for unix domain socket])
+fi
+
 # Setup --with-ssl/--without-ssl as arguments to configure
 SSL_CFLAGS=""
 SSL_LDFLAGS=""

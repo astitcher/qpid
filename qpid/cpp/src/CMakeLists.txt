@@ -684,6 +684,13 @@ include (ssl.cmake)
 # Check for optional AMQP 1.0 support requirements
 include (amqp.cmake)
 
+# Unix domain sockets
+check_symbol_exists (AF_UNIX "sys/socket.h" HAVE_UNIX_DOMAIN)
+if (HAVE_UNIX_DOMAIN)
+  set (QPID_SOCKET_DIR "/tmp/qpid" CACHE PATH "Directory for unix domain sockets")
+  set (QPID_SOCKET_NAME "amqp" CACHE STRING "Default filename for unix domain socket")
+endif (HAVE_UNIX_DOMAIN)
+
 # Check for syslog capabilities not present on all systems
 check_symbol_exists (LOG_AUTHPRIV "sys/syslog.h" HAVE_LOG_AUTHPRIV)
 check_symbol_exists (LOG_FTP "sys/syslog.h" HAVE_LOG_FTP)

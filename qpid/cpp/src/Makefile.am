@@ -150,7 +150,6 @@ AM_CXXFLAGS += -DBOOST_FILESYSTEM_VERSION=2
 qpidd_CXXFLAGS = $(AM_CXXFLAGS) -DQPIDD_MODULE_DIR=\"$(dmoduleexecdir)\" -DQPIDD_CONF_FILE=\"$(sysconfdir)/qpidd.conf\" -DQPIDC_CONF_FILE=\"$(confdir)/qpidc.conf\"
 libqpidbroker_la_CXXFLAGS = $(AM_CXXFLAGS) -DQPID_SOCKET_DIR=\"$(qpidsocketdir)\" -DQPID_SOCKET_NAME=\"$(qpidsocketname)\"
 libqpidclient_la_CXXFLAGS = $(AM_CXXFLAGS) -DQPIDC_MODULE_DIR=\"$(cmoduleexecdir)\" -DQPIDC_CONF_FILE=\"$(confdir)/qpidc.conf\"
-libqpidcommon_la_CXXFLAGS = $(AM_CXXFLAGS) -DQPID_SOCKET_DIR=\"$(qpidsocketdir)\" -DQPID_SOCKET_NAME=\"$(qpidsocketname)\"
 
 qpidd_LDADD =					\
   libqpidbroker.la				\

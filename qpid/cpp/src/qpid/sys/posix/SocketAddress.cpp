@@ -19,6 +19,8 @@
  *
  */
 
+#include "config.h"
+
 #include "qpid/sys/SocketAddress.h"
 
 #include "qpid/Exception.h"
@@ -28,6 +30,7 @@
 #include <netinet/in.h>
 #include <netdb.h>
 #include <string.h>
+
 
 namespace qpid {
 namespace sys {
@@ -109,11 +112,11 @@ uint16_t SocketAddress::getPort(::sockaddr const * const addr)
 namespace {
     // If the port left at default or empty use the default socket file name
     inline std::string socketfilename(const std::string& host, const std::string& port) {
-        if (port.empty() || port == "5672") {
+#ifdef HAVE_UNIX_DOMAIN
+        if (port.empty() || port == "5672")
             return host + "/" QPID_SOCKET_NAME;
-        } else {
-            return host + "/" + port;
-        }
+#endif // HAVE_UNIX_DOMAIN
+        return host + "/" + port;
     }
 }
 

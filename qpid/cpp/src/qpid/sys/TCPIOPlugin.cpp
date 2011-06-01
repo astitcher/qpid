@@ -18,6 +18,7 @@
  * under the License.
  *
  */
+#include "config.h"
 
 #include "qpid/sys/ProtocolFactory.h"
 
@@ -33,10 +34,10 @@
 #include <boost/bind.hpp>
 #include <boost/ptr_container/ptr_vector.hpp>
 
-// For mkdir (used only by Unix domain sockets)
-#ifdef __unix
+// For mkdir
+#ifdef HAVE_UNIX_DOMAIN
 #include <sys/stat.h>
-#endif
+#endif // HAVE_UNIX_DOMAIN
 
 namespace qpid {
 namespace sys {
@@ -114,9 +115,7 @@ static class TCPIOPlugin : public Plugin {
     }
 } tcpPlugin;
 
-// Unix domain sockets are only supported on Unix variants
-#ifdef __unix__
-
+#ifdef HAVE_UNIX_DOMAIN
 struct SocketConnectOptions :public Options {
     std::string socketDir;
     std::string socketName;
@@ -176,7 +175,7 @@ static class UnixIOPlugin : public Plugin {
         ::unlink(socketOptions.socketDir.c_str());
     }
 } unixPlugin;
-#endif // __unix__
+#endif // HAVE_UNIX_DOMAIN
 
 AsynchIOProtocolFactory::AsynchIOProtocolFactory(const std::string& host, const std::string& port,
                                                  int backlog, bool nodelay,
