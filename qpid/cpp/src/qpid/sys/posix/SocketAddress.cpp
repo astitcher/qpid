@@ -31,6 +31,7 @@
 #include <netdb.h>
 #include <string.h>
 
+#include <boost/lexical_cast.hpp>
 
 namespace qpid {
 namespace sys {
@@ -87,12 +88,12 @@ std::string SocketAddress::asString(::sockaddr const * const addr, size_t addrle
         case AF_INET6: s += "["; s += dispName; s+= "]"; break;
         case AF_UNIX:
             // If we're looking up an anonymous endpoint make a fake name
-            if (addrlen == sizeof(addr.sa_family)) {
+            if (addrlen == sizeof(addr->sa_family)) {
                 static int count = 0;
                 return boost::lexical_cast<std::string>(count++);
             } else {
-                int fname_len = addrlen-sizeof(addr.sa_family)-1;
-                return std::string(addr.sa_data, fname_len);
+                int fname_len = addrlen-sizeof(addr->sa_family)-1;
+                return std::string(addr->sa_data, fname_len);
             }
         default: throw Exception(QPID_MSG("Unexpected socket type"));
     }
@@ -107,6 +108,7 @@ uint16_t SocketAddress::getPort(::sockaddr const * const addr)
         case AF_INET: return ntohs(((const ::sockaddr_in*)(const void*)addr)->sin_port);
         case AF_INET6: return ntohs(((const ::sockaddr_in6*)(const void*)addr)->sin6_port);
         default:throw Exception(QPID_MSG("Unexpected socket type"));
+    }
 }
 
 namespace {
