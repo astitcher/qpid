@@ -29,6 +29,7 @@
 #include "qpid/sys/AsynchIO.h"
 #include "qpid/sys/ssl/SslIo.h"
 #include "qpid/sys/ssl/SslSocket.h"
+#include "qpid/sys/SocketAddress.h"
 #include "qpid/broker/Broker.h"
 #include "qpid/log/Statement.h"
 
@@ -79,7 +80,10 @@ class SslProtocolFactoryTmpl : public ProtocolFactory {
     bool nodict;
 
   public:
-    SslProtocolFactoryTmpl(const SslServerOptions&, int backlog, bool nodelay, Timer& timer, uint32_t maxTime);
+    SslProtocolFactoryTmpl(const std::string& host, const std::string& port,
+                           const SslServerOptions&,
+                           int backlog, bool nodelay,
+                           Timer& timer, uint32_t maxTime);
     void accept(Poller::shared_ptr, ConnectionCodec::Factory*);
     void connect(Poller::shared_ptr, const std::string& host, const std::string& port,
                  ConnectionCodec::Factory*,
@@ -139,14 +143,16 @@ static struct SslPlugin : public Plugin {
                     const broker::Broker::Options& opts = broker->getOptions();
 
                     ProtocolFactory::shared_ptr protocol(options.multiplex ?
-                        static_cast<ProtocolFactory*>(new SslMuxProtocolFactory(options,
-                                                  opts.connectionBacklog,
-                                                  opts.tcpNoDelay,
-                                                  broker->getTimer(), opts.maxNegotiateTime)) :
-                        static_cast<ProtocolFactory*>(new SslProtocolFactory(options,
-                                               opts.connectionBacklog,
-                                               opts.tcpNoDelay,
-                                               broker->getTimer(), opts.maxNegotiateTime)));
+                        static_cast<ProtocolFactory*>(new SslMuxProtocolFactory("", boost::lexical_cast<std::string>(options.port),
+                                                                                options,
+                                                                                opts.connectionBacklog,
+                                                                                opts.tcpNoDelay,
+                                                                                broker->getTimer(), opts.maxNegotiateTime)) :
+                        static_cast<ProtocolFactory*>(new SslProtocolFactory("", boost::lexical_cast<std::string>(options.port),
+                                                                             options,
+                                                                             opts.connectionBacklog,
+                                                                             opts.tcpNoDelay,
+                                                                             broker->getTimer(), opts.maxNegotiateTime)));
                     QPID_LOG(notice, "Listening for " <<
                                      (options.multiplex ? "SSL or TCP" : "SSL") <<
                                      " connections on TCP port " <<
@@ -161,10 +167,15 @@ static struct SslPlugin : public Plugin {
 } sslPlugin;
 
 template <class T>
-SslProtocolFactoryTmpl<T>::SslProtocolFactoryTmpl(const SslServerOptions& options, int backlog, bool nodelay, Timer& timer, uint32_t maxTime) :
+SslProtocolFactoryTmpl<T>::SslProtocolFactoryTmpl(const std::string& host, const std::string& port,
+                                                  const SslServerOptions& options,
+                                                  int backlog, bool nodelay,
+                                                  Timer& timer, uint32_t maxTime) :
     brokerTimer(timer),
     maxNegotiateTime(maxTime),
-    tcpNoDelay(nodelay), listeningPort(listener.listen(options.port, backlog, options.certName, options.clientAuth)),
+    tcpNoDelay(nodelay),
+    listener(options.certName, options.clientAuth),
+    listeningPort(listener.listen(SocketAddress(host, port), backlog)),
     nodict(options.nodict)
 {}
 

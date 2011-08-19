@@ -40,8 +40,10 @@ namespace ssl {
 class SslSocket : public qpid::sys::Socket
 {
 public:
-    /** Create a socket wrapper for descriptor. */
-    SslSocket();
+    /** Create a socket wrapper for descriptor.
+     *@param certName name of certificate to use to identify the socket
+     */
+    SslSocket(const std::string& certName = "", bool clientAuth = false);
 
     /** Set socket non blocking */
     void setNonblocking() const;
@@ -61,10 +63,9 @@ public:
     /** Bind to a port and start listening.
      *@param port 0 means choose an available port.
      *@param backlog maximum number of pending connections.
-     *@param certName name of certificate to use to identify the server
      *@return The bound port.
      */
-    int listen(uint16_t port = 0, int backlog = 10, const std::string& certName = "localhost.localdomain", bool clientAuth = false) const;
+    int listen(const SocketAddress&, int backlog = 10) const;
 
     /**
      * Accept a connection from a socket that is already listening
@@ -98,6 +99,7 @@ protected:
 class SslMuxSocket : public SslSocket
 {
 public:
+    SslMuxSocket(const std::string& certName = "", bool clientAuth = false);
     Socket* accept() const;
 };
 

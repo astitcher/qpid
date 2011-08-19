@@ -209,12 +209,6 @@ int Socket::read(void *buf, size_t count) const
     return received;
 }
 
-int Socket::listen(const std::string& host, const std::string& port, int backlog) const
-{
-    SocketAddress sa(host, port);
-    return listen(sa, backlog);
-}
-
 int Socket::listen(const SocketAddress& addr, int backlog) const
 {
     createSocket(addr);

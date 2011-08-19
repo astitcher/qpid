@@ -188,12 +188,6 @@ Socket::close() const
     socket = -1;
 }
 
-int Socket::listen(const std::string& host, const std::string& port, int backlog) const
-{
-    SocketAddress sa(host, port);
-    return listen(sa, backlog);
-}
-
 int Socket::listen(const SocketAddress& sa, int backlog) const
 {
     createSocket(sa);

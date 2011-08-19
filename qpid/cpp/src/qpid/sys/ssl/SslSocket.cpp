@@ -81,11 +81,15 @@ std::string getDomainFromSubject(std::string subject)
 }
 }
 
-SslSocket::SslSocket() : socket(0), prototype(0)
+SslSocket::SslSocket(const std::string& certName, bool clientAuth) :
+    socket(0), certname(certName), prototype(0)
 {
-    impl->fd = ::socket (PF_INET, SOCK_STREAM, 0);
-    if (impl->fd < 0) throw QPID_POSIX_ERROR(errno);
-    socket = SSL_ImportFD(0, PR_ImportTCPSocket(impl->fd));
+    //configure prototype socket:
+    prototype = SSL_ImportFD(0, PR_NewTCPSocket());
+    if (clientAuth) {
+        NSS_CHECK(SSL_OptionSet(prototype, SSL_REQUEST_CERTIFICATE, PR_TRUE));
+        NSS_CHECK(SSL_OptionSet(prototype, SSL_REQUIRE_CERTIFICATE, PR_TRUE));
+    }
 }
 
 /**
@@ -101,9 +105,25 @@ SslSocket::SslSocket(IOHandlePrivate* ioph, PRFileDesc* model) : Socket(ioph), s
 
 void SslSocket::setNonblocking() const
 {
+    if (!socket) {
+        Socket::setNonblocking();
+        return;
+    }
     PRSocketOptionData option;
     option.option = PR_SockOpt_Nonblocking;
     option.value.non_blocking = true;
+    PR_SetSocketOption(socket, &option);
+}
+
+void SslSocket::setTcpNoDelay() const
+{
+    if (!socket) {
+        Socket::setTcpNoDelay();
+        return;
+    }
+    PRSocketOptionData option;
+    option.option = PR_SockOpt_NoDelay;
+    option.value.no_delay = true;
     PR_SetSocketOption(socket, &option);
 }
 
@@ -112,6 +132,10 @@ void SslSocket::connect(const std::string& host, const std::string& port) const
     std::stringstream namestream;
     namestream << host << ":" << port;
     connectname = namestream.str();
+
+    impl->fd = ::socket (PF_INET, SOCK_STREAM, 0);
+    if (impl->fd < 0) throw QPID_POSIX_ERROR(errno);
+    socket = SSL_ImportFD(0, PR_ImportTCPSocket(impl->fd));
 
     void* arg;
     // Use the connection's cert-name if it has one; else use global cert-name
@@ -122,6 +146,7 @@ void SslSocket::connect(const std::string& host, const std::string& port) const
     } else {
         arg = const_cast<char*>(SslOptions::global.certName.c_str());
     }
+
     NSS_CHECK(SSL_GetClientAuthDataHook(socket, NSS_GetClientAuthData, arg));
     NSS_CHECK(SSL_SetURL(socket, host.data()));
 
@@ -141,22 +166,20 @@ void SslSocket::connect(const std::string& host, const std::string& port) const
 
 void SslSocket::close() const
 {
+    if (!socket) {
+        Socket::close();
+        return;
+    }
     if (impl->fd > 0) {
         PR_Close(socket);
         impl->fd = -1;
     }
 }
 
-int SslSocket::listen(uint16_t port, int backlog, const std::string& certName, bool clientAuth) const
+int SslSocket::listen(const SocketAddress& sa, int backlog) const
 {
-    //configure prototype socket:
-    prototype = SSL_ImportFD(0, PR_NewTCPSocket());
-    if (clientAuth) {
-        NSS_CHECK(SSL_OptionSet(prototype, SSL_REQUEST_CERTIFICATE, PR_TRUE));
-        NSS_CHECK(SSL_OptionSet(prototype, SSL_REQUIRE_CERTIFICATE, PR_TRUE));
-    }
-
     //get certificate and key (is this the correct way?)
+    std::string certName( (certname == "") ? "localhost.localdomain" : certname);
     CERTCertificate *cert = PK11_FindCertFromNickname(const_cast<char*>(certName.c_str()), 0);
     if (!cert) throw Exception(QPID_MSG("Failed to load certificate '" << certName << "'"));
     SECKEYPrivateKey *key = PK11_FindKeyByAnyCert(cert, 0);
@@ -165,24 +188,7 @@ int SslSocket::listen(uint16_t port, int backlog, const std::string& certName, b
     SECKEY_DestroyPrivateKey(key);
     CERT_DestroyCertificate(cert);
 
-    //bind and listen
-    const int& socket = impl->fd;
-    int yes=1;
-    QPID_POSIX_CHECK(setsockopt(socket,SOL_SOCKET,SO_REUSEADDR,&yes,sizeof(yes)));
-    struct sockaddr_in name;
-    name.sin_family = AF_INET;
-    name.sin_port = htons(port);
-    name.sin_addr.s_addr = 0;
-    if (::bind(socket, (struct sockaddr*)&name, sizeof(name)) < 0)
-        throw Exception(QPID_MSG("Can't bind to port " << port << ": " << strError(errno)));
-    if (::listen(socket, backlog) < 0)
-        throw Exception(QPID_MSG("Can't listen on port " << port << ": " << strError(errno)));
-
-    socklen_t namelen = sizeof(name);
-    if (::getsockname(socket, (struct sockaddr*)&name, &namelen) < 0)
-        throw QPID_POSIX_ERROR(errno);
-
-    return ntohs(name.sin_port);
+    return Socket::listen(sa, backlog);
 }
 
 SslSocket* SslSocket::accept() const
@@ -274,6 +280,11 @@ static bool isSslStream(int afd) {
     return isSSL2Handshake || isSSL3Handshake;
 }
 
+SslMuxSocket::SslMuxSocket(const std::string& certName, bool clientAuth) :
+    SslSocket(certName, clientAuth)
+{
+}
+
 Socket* SslMuxSocket::accept() const
 {
     int afd = ::accept(impl->fd, 0, 0);
@@ -301,14 +312,6 @@ int SslSocket::read(void *buf, size_t count) const
 int SslSocket::write(const void *buf, size_t count) const
 {
     return PR_Write(socket, buf, count);
-}
-
-void SslSocket::setTcpNoDelay() const
-{
-    PRSocketOptionData option;
-    option.option = PR_SockOpt_NoDelay;
-    option.value.no_delay = true;
-    PR_SetSocketOption(socket, &option);
 }
 
 void SslSocket::setCertName(const std::string& name)
