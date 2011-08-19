@@ -107,6 +107,7 @@ uint16_t SocketAddress::getPort(::sockaddr const * const addr)
     switch (addr->sa_family) {
         case AF_INET: return ntohs(((const ::sockaddr_in*)(const void*)addr)->sin_port);
         case AF_INET6: return ntohs(((const ::sockaddr_in6*)(const void*)addr)->sin6_port);
+        case AF_UNIX: return 0;
         default:throw Exception(QPID_MSG("Unexpected socket type"));
     }
 }
@@ -165,6 +166,7 @@ const ::addrinfo& getAddrInfo(const SocketAddress& sa)
         // Special hack to support Unix domain sockets
         if (sa.host[0] == '/') {
             sa.addrInfo = new ::addrinfo;
+            sa.addrInfo->ai_flags = 0;
             sa.addrInfo->ai_family = AF_UNIX;
             sa.addrInfo->ai_socktype = SOCK_STREAM;
             sa.addrInfo->ai_addr = (::sockaddr*) new ::sockaddr_storage;
@@ -173,6 +175,8 @@ const ::addrinfo& getAddrInfo(const SocketAddress& sa)
             std::string path(socketfilename(sa.host, sa.port));
             ::memcpy(sa.addrInfo->ai_addr->sa_data, path.c_str(), path.size());
             sa.addrInfo->ai_addrlen = sizeof(sa.addrInfo->ai_addr->sa_family)+path.size();
+            sa.addrInfo->ai_canonname = 0;
+            sa.addrInfo->ai_next = 0;
         } else {
             ::addrinfo hints;
             ::memset(&hints, 0, sizeof(hints));
