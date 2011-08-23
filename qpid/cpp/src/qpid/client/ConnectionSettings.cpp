@@ -30,7 +30,7 @@ namespace client {
 
 ConnectionSettings::ConnectionSettings() :
     protocol("tcp"),
-    host("localhost"),
+    host(""),
     port(5672),
     locale("en_US"),
     heartbeat(0),

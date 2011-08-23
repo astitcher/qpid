@@ -74,6 +74,8 @@ class TCPConnector : public Connector, public sys::Codec
     boost::shared_ptr<sys::Poller> poller;
     std::auto_ptr<qpid::sys::SecurityLayer> securityLayer;
 
+    std::string defaultHost;
+
     virtual void connected(const sys::Socket&);
     void writeDataBlock(const framing::AMQDataBlock& data);
 
@@ -109,7 +111,8 @@ public:
     TCPConnector(boost::shared_ptr<sys::Poller>,
               framing::ProtocolVersion pVersion,
               const ConnectionSettings&,
-              ConnectionImpl*);
+              ConnectionImpl*,
+              const char* defaultHost);
 };
 
 }}   // namespace qpid::client

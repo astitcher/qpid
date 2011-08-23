@@ -48,13 +48,23 @@ using boost::str;
 
 // Static constructor which registers connector here
 namespace {
-    Connector* create(Poller::shared_ptr p, framing::ProtocolVersion v, const ConnectionSettings& s, ConnectionImpl* c) {
-        return new TCPConnector(p, v, s, c);
+    Connector* createTCP(Poller::shared_ptr p, framing::ProtocolVersion v, const ConnectionSettings& s, ConnectionImpl* c) {
+        return new TCPConnector(p, v, s, c, "localhost");
+    }
+
+    Connector* createTCP6(Poller::shared_ptr p, framing::ProtocolVersion v, const ConnectionSettings& s, ConnectionImpl* c) {
+        return new TCPConnector(p, v, s, c, "::1");
+    }
+
+Connector* createUnix(Poller::shared_ptr p, framing::ProtocolVersion v, const ConnectionSettings& s, ConnectionImpl* c) {
+        return new TCPConnector(p, v, s, c, "/tmp/qpid");
     }
 
     struct StaticInit {
         StaticInit() {
-            Connector::registerFactory("tcp", &create);
+            Connector::registerFactory("tcp", &createTCP);
+            Connector::registerFactory("tcp6", &createTCP6);
+            Connector::registerFactory("unix", &createUnix);
         };
     } init;
 }
@@ -62,7 +72,8 @@ namespace {
 TCPConnector::TCPConnector(Poller::shared_ptr p,
                      ProtocolVersion ver,
                      const ConnectionSettings& settings,
-                     ConnectionImpl* cimpl)
+                     ConnectionImpl* cimpl,
+                     const char* defaultHost0)
     : maxFrameSize(settings.maxFrameSize),
       lastEof(0),
       currentSize(0),
@@ -75,7 +86,8 @@ TCPConnector::TCPConnector(Poller::shared_ptr p,
       socket(createSocket()),
       connector(0),
       aio(0),
-      poller(p)
+      poller(p),
+      defaultHost(defaultHost0)
 {
     QPID_LOG(debug, "TCPConnector created for " << version);
     settings.configureSocket(*socket);
@@ -85,7 +97,9 @@ TCPConnector::~TCPConnector() {
     close();
 }
 
-void TCPConnector::connect(const std::string& host, const std::string& port) {
+void TCPConnector::connect(const std::string& host0, const std::string& port) {
+    std::string host =  (host0.empty()) ? defaultHost : host0;
+
     Mutex::ScopedLock l(lock);
     assert(closed);
     connector = AsynchConnector::create(
