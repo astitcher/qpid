@@ -21,6 +21,7 @@
  *
  */
 
+#include <qpid/sys/AsynchIO.h>
 #include "qpid/sys/DispatchHandle.h"
 #include "qpid/sys/SecuritySettings.h"
 #include "qpid/sys/SocketAddress.h"
@@ -89,23 +90,6 @@ private:
     void failure(int, std::string);
 };
 
-struct SslIOBufferBase {
-    char* bytes;
-    int32_t byteCount;
-    int32_t dataStart;
-    int32_t dataCount;
-    
-    SslIOBufferBase(char* const b, const int32_t s) :
-        bytes(b),
-        byteCount(s),
-        dataStart(0),
-        dataCount(0)
-    {}
-    
-    virtual ~SslIOBufferBase()
-    {}
-};
-
 /*
  * Asychronous reader/writer: 
  * Reader accepts buffers to read into; reads into the provided buffers
@@ -118,18 +102,8 @@ struct SslIOBufferBase {
  * The class is implemented in terms of DispatchHandle to allow it to be deleted by deleting
  * the contained DispatchHandle
  */
-class SslIO : private qpid::sys::DispatchHandle {
+class SslIO : public AsynchIO, private qpid::sys::DispatchHandle {
 public:
-    typedef SslIOBufferBase BufferBase;
-
-    typedef boost::function2<void, SslIO&, BufferBase*> ReadCallback;
-    typedef boost::function1<void, SslIO&> EofCallback;
-    typedef boost::function1<void, SslIO&> DisconnectCallback;
-    typedef boost::function2<void, SslIO&, const SslSocket&> ClosedCallback;
-    typedef boost::function1<void, SslIO&> BuffersEmptyCallback;
-    typedef boost::function1<void, SslIO&> IdleCallback;
-    typedef boost::function1<void, SslIO&> RequestCallback;
-
     SslIO(const SslSocket& s,
           ReadCallback rCb, EofCallback eofCb, DisconnectCallback disCb,
           ClosedCallback cCb = 0, BuffersEmptyCallback eCb = 0, IdleCallback iCb = 0);
@@ -155,17 +129,6 @@ private:
     volatile bool writePending;
 
 public:
-    /*
-     * Size of IO buffers - this is the maximum possible frame size + 1
-     */
-    const static uint32_t MaxBufferSize = 65536;
-
-    /*
-     * Number of IO buffers allocated - I think the code can only use 2 -
-     * 1 for reading and 1 for writing, allocate 4 for safety
-     */
-    const static uint32_t BufferCount = 4;
-
     void queueForDeletion();
 
     void start(qpid::sys::Poller::shared_ptr poller);
@@ -176,6 +139,8 @@ public:
     void notifyPendingWrite();
     void queueWriteClose();
     bool writeQueueEmpty() { return writeQueue.empty(); }
+    void startReading() {};
+    void stopReading() {};
     void requestCallback(RequestCallback);
     BufferBase* getQueuedBuffer();
 
