@@ -20,6 +20,7 @@
  */
 
 #include "qpid/sys/ssl/SslSocket.h"
+#include "qpid/sys/SocketAddress.h"
 #include "qpid/sys/ssl/check.h"
 #include "qpid/sys/ssl/util.h"
 #include "qpid/Exception.h"
@@ -82,7 +83,7 @@ std::string getDomainFromSubject(std::string subject)
 }
 
 SslSocket::SslSocket(const std::string& certName, bool clientAuth) :
-    socket(0), certname(certName), prototype(0)
+    nssSocket(0), certname(certName), prototype(0)
 {
     //configure prototype socket:
     prototype = SSL_ImportFD(0, PR_NewTCPSocket());
@@ -97,45 +98,41 @@ SslSocket::SslSocket(const std::string& certName, bool clientAuth) :
  * returned from accept. Because we use posix accept rather than
  * PR_Accept, we have to reset the handshake.
  */
-SslSocket::SslSocket(IOHandlePrivate* ioph, PRFileDesc* model) : Socket(ioph), socket(0), prototype(0)
+SslSocket::SslSocket(IOHandlePrivate* ioph, PRFileDesc* model) : Socket(ioph), nssSocket(0), prototype(0)
 {
-    socket = SSL_ImportFD(model, PR_ImportTCPSocket(impl->fd));
-    NSS_CHECK(SSL_ResetHandshake(socket, true));
+    nssSocket = SSL_ImportFD(model, PR_ImportTCPSocket(impl->fd));
+    NSS_CHECK(SSL_ResetHandshake(nssSocket, PR_TRUE));
 }
 
 void SslSocket::setNonblocking() const
 {
-    if (!socket) {
+    if (!nssSocket) {
         Socket::setNonblocking();
         return;
     }
     PRSocketOptionData option;
     option.option = PR_SockOpt_Nonblocking;
     option.value.non_blocking = true;
-    PR_SetSocketOption(socket, &option);
+    PR_SetSocketOption(nssSocket, &option);
 }
 
 void SslSocket::setTcpNoDelay() const
 {
-    if (!socket) {
+    if (!nssSocket) {
         Socket::setTcpNoDelay();
         return;
     }
     PRSocketOptionData option;
     option.option = PR_SockOpt_NoDelay;
     option.value.no_delay = true;
-    PR_SetSocketOption(socket, &option);
+    PR_SetSocketOption(nssSocket, &option);
 }
 
-void SslSocket::connect(const std::string& host, const std::string& port) const
+void SslSocket::connect(const SocketAddress& addr) const
 {
-    std::stringstream namestream;
-    namestream << host << ":" << port;
-    connectname = namestream.str();
+    Socket::connect(addr);
 
-    impl->fd = ::socket (PF_INET, SOCK_STREAM, 0);
-    if (impl->fd < 0) throw QPID_POSIX_ERROR(errno);
-    socket = SSL_ImportFD(0, PR_ImportTCPSocket(impl->fd));
+    nssSocket = SSL_ImportFD(0, PR_ImportTCPSocket(impl->fd));
 
     void* arg;
     // Use the connection's cert-name if it has one; else use global cert-name
@@ -146,32 +143,23 @@ void SslSocket::connect(const std::string& host, const std::string& port) const
     } else {
         arg = const_cast<char*>(SslOptions::global.certName.c_str());
     }
+    NSS_CHECK(SSL_GetClientAuthDataHook(nssSocket, NSS_GetClientAuthData, arg));
 
-    NSS_CHECK(SSL_GetClientAuthDataHook(socket, NSS_GetClientAuthData, arg));
-    NSS_CHECK(SSL_SetURL(socket, host.data()));
+    url = addr.getHost();
+    NSS_CHECK(SSL_SetURL(nssSocket, url.data()));
 
-    char hostBuffer[PR_NETDB_BUF_SIZE];
-    PRHostEnt hostEntry;
-    PR_CHECK(PR_GetHostByName(host.data(), hostBuffer, PR_NETDB_BUF_SIZE, &hostEntry));
-    PRNetAddr address;
-    int value = PR_EnumerateHostEnt(0, &hostEntry, boost::lexical_cast<PRUint16>(port), &address);
-    if (value < 0) {
-        throw Exception(QPID_MSG("Error getting address for host: " << ErrorString()));
-    } else if (value == 0) {
-        throw Exception(QPID_MSG("Could not resolve address for host."));
-    }
-    PR_CHECK(PR_Connect(socket, &address, PR_INTERVAL_NO_TIMEOUT));
-    NSS_CHECK(SSL_ForceHandshake(socket));
+    NSS_CHECK(SSL_ResetHandshake(nssSocket, PR_FALSE));
+    NSS_CHECK(SSL_ForceHandshake(nssSocket));
 }
 
 void SslSocket::close() const
 {
-    if (!socket) {
+    if (!nssSocket) {
         Socket::close();
         return;
     }
     if (impl->fd > 0) {
-        PR_Close(socket);
+        PR_Close(nssSocket);
         impl->fd = -1;
     }
 }
@@ -306,12 +294,12 @@ Socket* SslMuxSocket::accept() const
 
 int SslSocket::read(void *buf, size_t count) const
 {
-    return PR_Read(socket, buf, count);
+    return PR_Read(nssSocket, buf, count);
 }
 
 int SslSocket::write(const void *buf, size_t count) const
 {
-    return PR_Write(socket, buf, count);
+    return PR_Write(nssSocket, buf, count);
 }
 
 void SslSocket::setCertName(const std::string& name)
@@ -327,7 +315,7 @@ int SslSocket::getKeyLen() const
     int keySize = 0;
     SECStatus   rc;
 
-    rc = SSL_SecurityStatus( socket,
+    rc = SSL_SecurityStatus( nssSocket,
                              &enabled,
                              NULL,
                              NULL,
@@ -342,7 +330,7 @@ int SslSocket::getKeyLen() const
 std::string SslSocket::getClientAuthId() const
 {
     std::string authId;
-    CERTCertificate* cert = SSL_PeerCertificate(socket);
+    CERTCertificate* cert = SSL_PeerCertificate(nssSocket);
     if (cert) {
         authId = CERT_GetCommonName(&(cert->subject));
         /*

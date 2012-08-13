@@ -168,7 +168,7 @@ void SslConnector::connect(const std::string& host, const std::string& port){
     Mutex::ScopedLock l(lock);
     assert(closed);
     try {
-        socket.connect(host, port);
+        socket.connect(SocketAddress(host, port));
     } catch (const std::exception& e) {
         socket.close();
         throw TransportFailure(e.what());

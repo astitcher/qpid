@@ -134,13 +134,14 @@ SslConnector::SslConnector(const SslSocket& s,
                    boost::bind(&SslConnector::connComplete, this, _1)),
     connCallback(connCb),
     failCallback(failCb),
-    socket(s)
+    socket(s),
+    sa(hostname, port)
 {
     //TODO: would be better for connect to be performed on a
     //non-blocking socket, but that doesn't work at present so connect
     //blocks until complete
     try {
-        socket.connect(hostname, port);
+        socket.connect(sa);
         socket.setNonblocking();
         startWatch(poller);
     } catch(std::exception& e) {

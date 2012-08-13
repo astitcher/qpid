@@ -56,7 +56,7 @@ public:
      * NSSInit().*/
     void setCertName(const std::string& certName);
 
-    void connect(const std::string& host, const std::string& port) const;
+    void connect(const SocketAddress&) const;
 
     void close() const;
 
@@ -81,9 +81,9 @@ public:
     std::string getClientAuthId() const;
 
 protected:
-    mutable std::string connectname;
-    mutable PRFileDesc* socket;
+    mutable PRFileDesc* nssSocket;
     std::string certname;
+    mutable std::string url;
 
     /**
      * 'model' socket, with configuration to use when importing

@@ -23,6 +23,7 @@
 
 #include "qpid/sys/DispatchHandle.h"
 #include "qpid/sys/SecuritySettings.h"
+#include "qpid/sys/SocketAddress.h"
 
 #include <boost/function.hpp>
 #include <boost/shared_array.hpp>
@@ -73,6 +74,7 @@ private:
     ConnectedCallback connCallback;
     FailedCallback failCallback;
     const SslSocket& socket;
+    SocketAddress sa;
 
 public:
     SslConnector(const SslSocket& socket,

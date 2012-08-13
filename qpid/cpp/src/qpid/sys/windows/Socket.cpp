@@ -160,12 +160,6 @@ void Socket::setNonblocking() const {
     QPID_WINSOCK_CHECK(ioctlsocket(impl->fd, FIONBIO, &nonblock));
 }
 
-void Socket::connect(const std::string& host, const std::string& port) const
-{
-    SocketAddress sa(host, port);
-    connect(sa);
-}
-
 void
 Socket::connect(const SocketAddress& addr) const
 {

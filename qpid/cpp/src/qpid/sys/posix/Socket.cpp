@@ -135,12 +135,6 @@ void Socket::setTcpNoDelay() const
     }
 }
 
-void Socket::connect(const std::string& host, const std::string& port) const
-{
-    SocketAddress sa(host, port);
-    connect(sa);
-}
-
 void Socket::connect(const SocketAddress& addr) const
 {
     // The display name for an outbound connection needs to be the name that was specified
