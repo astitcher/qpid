@@ -43,7 +43,7 @@ class SslSocket;
  * Asynchronous ssl acceptor: accepts connections then does a callback
  * with the accepted fd
  */
-class SslAcceptor {
+class SslAcceptor : public AsynchAcceptor {
 public:
     typedef boost::function1<void, const Socket&> Callback;
 
@@ -65,24 +65,26 @@ private:
  * Asynchronous ssl connector: starts the process of initiating a
  * connection and invokes a callback when completed or failed.
  */
-class SslConnector : private qpid::sys::DispatchHandle {
+class SslConnector : public AsynchConnector, private qpid::sys::DispatchHandle {
 public:
-    typedef boost::function1<void, const SslSocket&> ConnectedCallback;
+    typedef boost::function1<void, const Socket&> ConnectedCallback;
     typedef boost::function2<void, int, std::string> FailedCallback;
 
 private:
     ConnectedCallback connCallback;
     FailedCallback failCallback;
-    const SslSocket& socket;
+    const Socket& socket;
     SocketAddress sa;
 
 public:
-    SslConnector(const SslSocket& socket,
+    SslConnector(const Socket& socket,
                     Poller::shared_ptr poller,
                     std::string hostname,
                     std::string port,
                     ConnectedCallback connCb,
                     FailedCallback failCb = 0);
+
+    void start(qpid::sys::Poller::shared_ptr poller);
 
 private:
     void connComplete(DispatchHandle& handle);
@@ -103,7 +105,7 @@ private:
  */
 class SslIO : public AsynchIO, private qpid::sys::DispatchHandle {
 public:
-    SslIO(const SslSocket& s,
+    SslIO(const Socket& s,
           ReadCallback rCb, EofCallback eofCb, DisconnectCallback disCb,
           ClosedCallback cCb = 0, BuffersEmptyCallback eCb = 0, IdleCallback iCb = 0);
 private:
@@ -113,7 +115,7 @@ private:
     ClosedCallback closedCallback;
     BuffersEmptyCallback emptyCallback;
     IdleCallback idleCallback;
-    const SslSocket& socket;
+    const Socket& socket;
     std::deque<BufferBase*> bufferQueue;
     std::deque<BufferBase*> writeQueue;
     std::vector<BufferBase> buffers;

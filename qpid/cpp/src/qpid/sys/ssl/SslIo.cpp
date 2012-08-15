@@ -114,7 +114,7 @@ void SslAcceptor::readable(DispatchHandle& h) {
  * Asynch Connector
  */
 
-SslConnector::SslConnector(const SslSocket& s,
+SslConnector::SslConnector(const Socket& s,
                                  Poller::shared_ptr poller,
                                  std::string hostname,
                                  std::string port,
@@ -139,6 +139,10 @@ SslConnector::SslConnector(const SslSocket& s,
     } catch(std::exception& e) {
         failure(-1, std::string(e.what()));
     }
+}
+
+void SslConnector::start(qpid::sys::Poller::shared_ptr)
+{
 }
 
 void SslConnector::connComplete(DispatchHandle& h)
@@ -169,7 +173,7 @@ void SslConnector::failure(int errCode, std::string message)
 /*
  * Asynch reader/writer
  */
-SslIO::SslIO(const SslSocket& s,
+SslIO::SslIO(const Socket& s,
                    ReadCallback rCb, EofCallback eofCb, DisconnectCallback disCb,
                    ClosedCallback cCb, BuffersEmptyCallback eCb, IdleCallback iCb) :
 
