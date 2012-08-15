@@ -69,8 +69,6 @@ template <class T>
 class SslProtocolFactoryTmpl : public ProtocolFactory {
   private:
 
-    typedef SslAcceptorTmpl<T> SslAcceptor;
-
     Timer& brokerTimer;
     uint32_t maxNegotiateTime;
     const bool tcpNoDelay;

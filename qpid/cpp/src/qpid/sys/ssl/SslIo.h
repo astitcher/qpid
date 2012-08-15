@@ -43,19 +43,18 @@ class SslSocket;
  * Asynchronous ssl acceptor: accepts connections then does a callback
  * with the accepted fd
  */
-template <class T>
-class SslAcceptorTmpl {
+class SslAcceptor {
 public:
     typedef boost::function1<void, const Socket&> Callback;
 
 private:
     Callback acceptedCallback;
     qpid::sys::DispatchHandle handle;
-    const T& socket;
+    const Socket& socket;
 
 public:
-    SslAcceptorTmpl(const T& s, Callback callback);
-    ~SslAcceptorTmpl();
+    SslAcceptor(const Socket& s, Callback callback);
+    ~SslAcceptor();
     void start(qpid::sys::Poller::shared_ptr poller);
 
 private:

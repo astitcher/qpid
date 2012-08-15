@@ -68,32 +68,28 @@ __thread int64_t threadMaxIoTimeNs = 2 * 1000000; // start at 2ms
  * Asynch Acceptor
  */
 
-template <class T>
-SslAcceptorTmpl<T>::SslAcceptorTmpl(const T& s, Callback callback) :
+SslAcceptor::SslAcceptor(const Socket& s, Callback callback) :
     acceptedCallback(callback),
-    handle(s, boost::bind(&SslAcceptorTmpl<T>::readable, this, _1), 0, 0),
+    handle(s, boost::bind(&SslAcceptor::readable, this, _1), 0, 0),
     socket(s) {
 
     s.setNonblocking();
     ignoreSigpipe();
 }
 
-template <class T>
-SslAcceptorTmpl<T>::~SslAcceptorTmpl()
+SslAcceptor::~SslAcceptor()
 {
     handle.stopWatch();
 }
 
-template <class T>
-void SslAcceptorTmpl<T>::start(Poller::shared_ptr poller) {
+void SslAcceptor::start(Poller::shared_ptr poller) {
     handle.startWatch(poller);
 }
 
 /*
  * We keep on accepting as long as there is something to accept
  */
-template <class T>
-void SslAcceptorTmpl<T>::readable(DispatchHandle& h) {
+void SslAcceptor::readable(DispatchHandle& h) {
     Socket* s;
     do {
         errno = 0;
@@ -113,10 +109,6 @@ void SslAcceptorTmpl<T>::readable(DispatchHandle& h) {
 
     h.rewatch();
 }
-
-// Explicitly instantiate the templates we need
-template class SslAcceptorTmpl<SslSocket>;
-template class SslAcceptorTmpl<SslMuxSocket>;
 
 /*
  * Asynch Connector
