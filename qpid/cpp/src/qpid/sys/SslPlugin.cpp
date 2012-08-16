@@ -72,7 +72,7 @@ class SslProtocolFactory : public ProtocolFactory {
     const bool tcpNoDelay;
     std::auto_ptr<Socket> listener;
     const uint16_t listeningPort;
-    std::auto_ptr<SslAcceptor> acceptor;
+    std::auto_ptr<AsynchAcceptor> acceptor;
     bool nodict;
 
   public:
@@ -176,9 +176,9 @@ uint16_t SslProtocolFactory::getPort() const {
 void SslProtocolFactory::accept(Poller::shared_ptr poller,
                                        ConnectionCodec::Factory* fact) {
     acceptor.reset(
-        new SslAcceptor(*listener,
-                        boost::bind(&SslProtocolFactory::established,
-                                    this, poller, _1, fact, false)));
+        AsynchAcceptor::create(
+            *listener,
+            boost::bind(&SslProtocolFactory::established, this, poller, _1, fact, false)));
     acceptor->start(poller);
 }
 
@@ -196,14 +196,14 @@ void SslProtocolFactory::established(Poller::shared_ptr poller, const Socket& s,
         async->setClient();
     }
 
-    AsynchIO* aio = AsynchIO::create
-      (s,
-       boost::bind(&AsynchIOHandler::readbuff, async, _1, _2),
-       boost::bind(&AsynchIOHandler::eof, async, _1),
-       boost::bind(&AsynchIOHandler::disconnect, async, _1),
-       boost::bind(&AsynchIOHandler::closedSocket, async, _1, _2),
-       boost::bind(&AsynchIOHandler::nobuffs, async, _1),
-       boost::bind(&AsynchIOHandler::idle, async, _1));
+    AsynchIO* aio = AsynchIO::create(
+        s,
+        boost::bind(&AsynchIOHandler::readbuff, async, _1, _2),
+        boost::bind(&AsynchIOHandler::eof, async, _1),
+        boost::bind(&AsynchIOHandler::disconnect, async, _1),
+        boost::bind(&AsynchIOHandler::closedSocket, async, _1, _2),
+        boost::bind(&AsynchIOHandler::nobuffs, async, _1),
+        boost::bind(&AsynchIOHandler::idle, async, _1));
 
     async->init(aio, brokerTimer, maxNegotiateTime);
 
