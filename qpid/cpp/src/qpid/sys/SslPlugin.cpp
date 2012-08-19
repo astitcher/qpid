@@ -26,9 +26,9 @@
 #include "qpid/sys/ssl/util.h"
 #include "qpid/sys/AsynchIOHandler.h"
 #include "qpid/sys/AsynchIO.h"
-#include "qpid/sys/ssl/SslIo.h"
 #include "qpid/sys/ssl/SslSocket.h"
 #include "qpid/sys/SocketAddress.h"
+#include "qpid/sys/Poller.h"
 #include "qpid/broker/Broker.h"
 #include "qpid/log/Statement.h"
 
@@ -90,6 +90,7 @@ class SslProtocolFactory : public ProtocolFactory {
   private:
     void established(Poller::shared_ptr, const Socket&, ConnectionCodec::Factory*,
                      bool isClient);
+    void connectFailed(const Socket&, int, const std::string&, ConnectFailedCallback);
 };
 
 
@@ -211,6 +212,15 @@ void SslProtocolFactory::established(Poller::shared_ptr poller, const Socket& s,
 
 }
 
+void SslProtocolFactory::connectFailed(
+    const Socket& s, int ec, const std::string& emsg,
+    ConnectFailedCallback failedCb)
+{
+    failedCb(ec, emsg);
+    s.close();
+    delete &s;
+}
+
 void SslProtocolFactory::connect(
     Poller::shared_ptr poller,
     const std::string& host, const std::string& port,
@@ -223,10 +233,23 @@ void SslProtocolFactory::connect(
     // shutdown.  The allocated SslConnector frees itself when it
     // is no longer needed.
 
-    qpid::sys::ssl::SslSocket* socket = new qpid::sys::ssl::SslSocket();
-    new SslConnector(*socket, poller, host, port,
-                     boost::bind(&SslProtocolFactory::established, this, poller, _1, fact, true),
-                     failed);
+    Socket* socket = new qpid::sys::ssl::SslSocket();
+    try {
+    AsynchConnector* c = AsynchConnector::create(
+        *socket,
+        host,
+        port,
+        boost::bind(&SslProtocolFactory::established,
+                    this, poller, _1, fact, true),
+        boost::bind(&SslProtocolFactory::connectFailed,
+                    this, _1, _2, _3, failed));
+    c->start(poller);
+    } catch (std::exception&) {
+        // TODO: Design question - should we do the error callback and also throw?
+        int errCode = socket->getError();
+        connectFailed(*socket, errCode, strError(errCode), failed);
+        throw;
+    }
 }
 
 }} // namespace qpid::sys
