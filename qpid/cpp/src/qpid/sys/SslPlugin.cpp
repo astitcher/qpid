@@ -22,19 +22,17 @@
 #include "qpid/sys/ProtocolFactory.h"
 
 #include "qpid/Plugin.h"
-#include "qpid/sys/ssl/check.h"
-#include "qpid/sys/ssl/util.h"
+#include "qpid/broker/Broker.h"
+#include "qpid/log/Statement.h"
 #include "qpid/sys/AsynchIOHandler.h"
 #include "qpid/sys/AsynchIO.h"
+#include "qpid/sys/ssl/util.h"
 #include "qpid/sys/ssl/SslSocket.h"
 #include "qpid/sys/SocketAddress.h"
 #include "qpid/sys/Poller.h"
-#include "qpid/broker/Broker.h"
-#include "qpid/log/Statement.h"
 
 #include <boost/bind.hpp>
-#include <memory>
-
+#include <boost/ptr_container/ptr_vector.hpp>
 
 namespace qpid {
 namespace sys {
@@ -65,14 +63,12 @@ struct SslServerOptions : ssl::SslOptions
 };
 
 class SslProtocolFactory : public ProtocolFactory {
-  private:
-
+    boost::ptr_vector<Socket> listeners;
+    boost::ptr_vector<AsynchAcceptor> acceptors;
     Timer& brokerTimer;
     uint32_t maxNegotiateTime;
+    uint16_t listeningPort;
     const bool tcpNoDelay;
-    std::auto_ptr<Socket> listener;
-    const uint16_t listeningPort;
-    std::auto_ptr<AsynchAcceptor> acceptor;
     bool nodict;
 
   public:
@@ -83,7 +79,7 @@ class SslProtocolFactory : public ProtocolFactory {
     void accept(Poller::shared_ptr, ConnectionCodec::Factory*);
     void connect(Poller::shared_ptr, const std::string& host, const std::string& port,
                  ConnectionCodec::Factory*,
-                 boost::function2<void, int, std::string> failed);
+                 ConnectFailedCallback);
 
     uint16_t getPort() const;
 
@@ -144,7 +140,7 @@ static struct SslPlugin : public Plugin {
                                                                              broker->getTimer(), opts.maxNegotiateTime)));
                     QPID_LOG(notice, "Listening for " <<
                                      (options.multiplex ? "SSL or TCP" : "SSL") <<
-                                     " connections on TCP port " <<
+                                     " connections on TCP/TCP6 port " <<
                                      protocol->getPort());
                     broker->registerProtocolFactory("ssl", protocol);
                 } catch (const std::exception& e) {
@@ -162,29 +158,39 @@ SslProtocolFactory::SslProtocolFactory(const std::string& host, const std::strin
     brokerTimer(timer),
     maxNegotiateTime(maxTime),
     tcpNoDelay(nodelay),
-    listener(options.multiplex ?
-        new SslMuxSocket(options.certName, options.clientAuth) :
-        new SslSocket(options.certName, options.clientAuth)),
-    listeningPort(listener->listen(SocketAddress(host, port), backlog)),
     nodict(options.nodict)
-{}
+{
+    SocketAddress sa(host, port);
 
+    // We must have at least one resolved address
+    QPID_LOG(info, "Listening to: " << sa.asString())
+    Socket* s = options.multiplex ?
+        new SslMuxSocket(options.certName, options.clientAuth) :
+        new SslSocket(options.certName, options.clientAuth);
+    uint16_t lport = s->listen(sa, backlog);
+    QPID_LOG(debug, "Listened to: " << lport);
+    listeners.push_back(s);
 
-uint16_t SslProtocolFactory::getPort() const {
-    return listeningPort; // Immutable no need for lock.
+    listeningPort = lport;
+
+    // Try any other resolved addresses
+    while (sa.nextAddress()) {
+        // Hack to ensure that all listening connections are on the same port
+        sa.setAddrInfoPort(listeningPort);
+        QPID_LOG(info, "Listening to: " << sa.asString())
+        Socket* s = options.multiplex ?
+            new SslMuxSocket(options.certName, options.clientAuth) :
+            new SslSocket(options.certName, options.clientAuth);
+        uint16_t lport = s->listen(sa, backlog);
+        QPID_LOG(debug, "Listened to: " << lport);
+        listeners.push_back(s);
+    }
+
 }
 
-void SslProtocolFactory::accept(Poller::shared_ptr poller,
-                                       ConnectionCodec::Factory* fact) {
-    acceptor.reset(
-        AsynchAcceptor::create(
-            *listener,
-            boost::bind(&SslProtocolFactory::established, this, poller, _1, fact, false)));
-    acceptor->start(poller);
-}
 
 void SslProtocolFactory::established(Poller::shared_ptr poller, const Socket& s,
-                                        ConnectionCodec::Factory* f, bool isClient) {
+                                     ConnectionCodec::Factory* f, bool isClient) {
 
     AsynchIOHandler* async = new AsynchIOHandler(s.getFullAddress(), f, nodict);
 
@@ -207,9 +213,21 @@ void SslProtocolFactory::established(Poller::shared_ptr poller, const Socket& s,
         boost::bind(&AsynchIOHandler::idle, async, _1));
 
     async->init(aio, brokerTimer, maxNegotiateTime);
-
     aio->start(poller);
+}
 
+uint16_t SslProtocolFactory::getPort() const {
+    return listeningPort; // Immutable no need for lock.
+}
+
+void SslProtocolFactory::accept(Poller::shared_ptr poller,
+                                ConnectionCodec::Factory* fact) {
+    for (unsigned i = 0; i<listeners.size(); ++i) {
+        acceptors.push_back(
+            AsynchAcceptor::create(listeners[i],
+                            boost::bind(&SslProtocolFactory::established, this, poller, _1, fact, false)));
+        acceptors[i].start(poller);
+    }
 }
 
 void SslProtocolFactory::connectFailed(
