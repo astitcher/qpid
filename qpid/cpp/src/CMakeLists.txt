@@ -1440,19 +1440,26 @@ add_subdirectory(qpid/store)
 add_subdirectory(tests)
 
 # Support for pkg-config
-if (UNIX)
-  add_custom_target(pkgconfig ALL echo DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/qpid.pc)
-  configure_file(${CMAKE_CURRENT_SOURCE_DIR}/qpid.pc.in
-                 ${CMAKE_CURRENT_BINARY_DIR}/qpid.pc)
-  install (FILES ${CMAKE_CURRENT_BINARY_DIR}/qpid.pc
-           DESTINATION ${QPID_INSTALL_LIBDIR}/pkgconfig
-           COMPONENT ${QPID_COMPONENT_COMMON})
 
-  add_dependencies(pkgconfig ${CMAKE_CURRENT_BINARY_DIR}/qmf2.pc)
-  configure_file(${CMAKE_CURRENT_SOURCE_DIR}/qmf2.pc.in
-                 ${CMAKE_CURRENT_BINARY_DIR}/qmf2.pc)
-  install (FILES ${CMAKE_CURRENT_BINARY_DIR}/qmf2.pc
-           DESTINATION ${QPID_INSTALL_LIBDIR}/pkgconfig
-           COMPONENT ${QPID_COMPONENT_COMMON})
-endif (UNIX)
+# Compatible variable names used in the pkg config files also for autoconf
+set (prefix ${CMAKE_INSTALL_PREFIX})
+set (exec_prefix ${CMAKE_INSTALL_PREFIX})
+if (${LIB_INSTALL_DIR} MATCHES "^/.*")
+  set (libdir ${LIB_INSTALL_DIR})
+else ()
+  set (libdir ${CMAKE_INSTALL_PREFIX}/${LIB_INSTALL_DIR})
+endif ()
+if (${INCLUDE_INSTALL_DIR} MATCHES "^/.*")
+  set (includedir ${INCLUDE_INSTALL_DIR})
+else ()
+  set (includedir ${CMAKE_INSTALL_PREFIX}/${INCLUDE_INSTALL_DIR})
+endif ()
+set (VERSION ${QPID_VERSION})
 
+#add_custom_target(pkgconfig ALL echo DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/qpid.pc)
+#add_dependencies(pkgconfig ${CMAKE_CURRENT_BINARY_DIR}/qmf2.pc)
+configure_file(qpid.pc.in qpid.pc @ONLY)
+configure_file(qmf2.pc.in qmf2.pc @ONLY)
+install (FILES ${CMAKE_CURRENT_BINARY_DIR}/qpid.pc ${CMAKE_CURRENT_BINARY_DIR}/qmf2.pc
+         DESTINATION ${LIB_INSTALL_DIR}/pkgconfig
+         COMPONENT ${QPID_COMPONENT_COMMON})
