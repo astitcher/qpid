@@ -94,8 +94,8 @@ if (WIN32)
        "Directory to install read-only arch.-independent data root")
   set (QPID_INSTALL_EXAMPLESDIR examples CACHE STRING
        "Directory to install programming examples in")
-  set (QPID_INSTALL_HTMLDIR docs/api/html CACHE STRING
-       "Directory to install HTML documentation")
+  set (QPID_INSTALL_DOCDIR docs CACHE STRING
+       "Directory to install documentation")
   set (QPID_INSTALL_INCLUDEDIR include CACHE STRING
        "Directory to install programming header files")
   set (QPID_INSTALL_LIBDIR bin CACHE STRING
@@ -109,6 +109,16 @@ if (WIN32)
 endif (WIN32)
 
 if (UNIX)
+# function to get absolute path from a variable that may be relative to the
+# install prefix
+function(set_absolute_install_path var input)
+  if (${input} MATCHES "^/.*")
+    set (${var} ${input} PARENT_SCOPE)
+  else ()
+    set (${var} ${CMAKE_INSTALL_PREFIX}/${input} PARENT_SCOPE)
+  endif ()
+endfunction(set_absolute_install_path)
+
 # In rpm builds the build sets some variables:
 #  CMAKE_INSTALL_PREFIX - this is a standard cmake variable
 #  INCLUDE_INSTALL_DIR
@@ -121,7 +131,7 @@ if (UNIX)
   set (LIB_INSTALL_DIR lib CACHE PATH "Library object file directory")
   set (SYSCONF_INSTALL_DIR etc CACHE PATH "System read only configuration directory")
   set (SHARE_INSTALL_DIR share CACHE PATH "Shared read only data directory")
-  set (DOC_INSTALL_DIR ${SHARE_INSTALL_DIR}/doc/${CMAKE_PROJECT_NAME} CACHE PATH "Shared read only data directory")
+  set (DOC_INSTALL_DIR ${SHARE_INSTALL_DIR}/doc/${CMAKE_PROJECT_NAME}-${QPID_VERSION} CACHE PATH "Shared read only data directory")
   
   set (QPID_COMPONENT_BROKER runtime)
   set (QPID_COMPONENT_CLIENT runtime)
@@ -140,13 +150,14 @@ if (UNIX)
   set (QPID_INSTALL_TESTDIR libexec/qpid/tests) # Directory for test executables
   set (QPID_INSTALL_CONFDIR ${SYSCONF_INSTALL_DIR}/qpid)
   set (QPID_INSTALL_SASLDIR ${SYSCONF_INSTALL_DIR}/sasl2)
-  set (QPID_INSTALL_DATADIR ${SHARE_INSTALL_DIR}/${CMAKE_PROJECT_NAME})
+  set (QPID_INSTALL_DATADIR ${SHARE_INSTALL_DIR}/qpid)
   set (QPID_INSTALL_EXAMPLESDIR ${SHARE_INSTALL_DIR}/examples)
-  set (QPID_INSTALL_HTMLDIR ${DOC_INSTALL_DIR}/html) # Directory to install HTML documentation
+  set (QPID_INSTALL_DOCDIR ${DOC_INSTALL_DIR}) # Directory to install documentation
   set (QPID_INSTALL_INCLUDEDIR ${INCLUDE_INSTALL_DIR})
   set (QPID_INSTALL_LIBDIR ${LIB_INSTALL_DIR})
-  set (QPIDC_MODULE_DIR ${QPID_INSTALL_LIBDIR}/${CMAKE_PROJECT_NAME}/client) # Directory to load client plug-in modules from
-  set (QPIDD_MODULE_DIR ${QPID_INSTALL_LIBDIR}/${CMAKE_PROJECT_NAME}/daemon) # Directory to load broker plug-in modules from
   set (QPID_LOCALSTATE_DIR var) # Directory to store local state data
   set (QPID_MAN_DIR man) # Directory to install manual files
+
+  set_absolute_install_path (QPIDC_MODULE_DIR ${QPID_INSTALL_LIBDIR}/qpid/client) # Directory to load client plug-in modules from
+  set_absolute_install_path (QPIDD_MODULE_DIR ${QPID_INSTALL_LIBDIR}/qpid/daemon) # Directory to load broker plug-in modules from
 endif (UNIX)
