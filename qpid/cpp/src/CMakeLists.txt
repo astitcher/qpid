@@ -1213,10 +1213,12 @@ if (CPACK_GENERATOR STREQUAL "NSIS")
          "qpidd" "Start Qpid Broker")
 endif (CPACK_GENERATOR STREQUAL "NSIS")
 
-if (UNIX)
-  install (CODE "FILE(MAKE_DIRECTORY \$ENV{DESTDIR}${QPID_LOCALSTATE_DIR}/lib/qpidd)")
-  install (CODE "FILE(MAKE_DIRECTORY \$ENV{DESTDIR}${QPID_LOCALSTATE_DIR}/spool/qpidd)")
-endif (UNIX)
+# This seems wrong
+#if (UNIX)
+#  install (CODE "FILE(MAKE_DIRECTORY \$ENV{DESTDIR}${QPID_LOCALSTATE_DIR}/lib/qpidd)")
+#  install (CODE "FILE(MAKE_DIRECTORY \$ENV{DESTDIR}${QPID_LOCALSTATE_DIR}/spool/qpidd)")
+#endif (UNIX)
+
 
 set (qmf_SOURCES
     qpid/agent/ManagementAgentImpl.cpp
