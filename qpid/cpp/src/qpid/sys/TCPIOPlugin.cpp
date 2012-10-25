@@ -163,7 +163,8 @@ static class UnixIOPlugin : public Plugin {
 
             ProtocolFactory::shared_ptr protocolu(
                 new AsynchIOProtocolFactory(
-                    socketOptions.socketDir, socketOptions.socketName, opts.connectionBacklog, false));
+                    socketOptions.socketDir, socketOptions.socketName, opts.connectionBacklog, false,
+                    broker->getTimer(), opts.maxNegotiateTime, true));
             QPID_LOG(notice, "Listening on Unix domain socket " << path);
             broker->registerProtocolFactory("unix", protocolu);
 
