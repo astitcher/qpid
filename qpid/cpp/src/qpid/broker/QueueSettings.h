@@ -58,6 +58,10 @@ struct QueueSettings
     QueueDepth maxDepth;
     bool dropMessagesAtLimit;//aka ring queue policy
 
+    //PagedQueue:
+    bool paging;
+    uint maxPages;
+
     bool noLocal;
     bool isBrowseOnly;
     std::string traceId;

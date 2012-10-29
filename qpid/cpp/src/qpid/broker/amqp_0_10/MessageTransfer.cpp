@@ -219,11 +219,16 @@ void MessageTransfer::decodeHeader(framing::Buffer& buffer)
 }
 void MessageTransfer::decodeContent(framing::Buffer& buffer)
 {
-    if (buffer.available()) {
+    decodeContent(buffer, buffer.available());
+}
+
+void MessageTransfer::decodeContent(framing::Buffer& buffer, size_t size)
+{
+    if (size) {
         //get the data as a string and set that as the content
         //body on a frame then add that frame to the frameset
         AMQFrame frame((AMQContentBody()));
-        frame.castBody<AMQContentBody>()->decode(buffer, buffer.available());
+        frame.castBody<AMQContentBody>()->decode(buffer, size);
         frame.setFirstSegment(false);
         frames.append(frame);
     } else {

@@ -30,6 +30,7 @@
 #include "qpid/broker/Fairshare.h"
 #include "qpid/broker/MessageDeque.h"
 #include "qpid/broker/MessageMap.h"
+#include "qpid/broker/PagedQueue.h"
 #include "qpid/broker/PriorityQueue.h"
 #include "qpid/broker/QueueFlowLimit.h"
 #include "qpid/broker/ThresholdAlerts.h"
@@ -39,7 +40,9 @@
 
 namespace qpid {
 namespace broker {
-
+namespace {
+const std::string PATH_SEPARATOR("/");//TODO: make platform dependent
+}
 
 QueueFactory::QueueFactory() : broker(0), store(0), parent(0) {}
 
@@ -66,6 +69,9 @@ boost::shared_ptr<Queue> QueueFactory::create(const std::string& name, const Que
         } else {
             queue->messages = std::auto_ptr<Messages>(new PriorityQueue(settings.priorities));
         }
+    } else if (settings.paging) {
+        std::string path = broker ? (broker->getOptions().dataDir + PATH_SEPARATOR + name) : name;
+        queue->messages = std::auto_ptr<Messages>(new PagedQueue(path, settings.maxPages ? settings.maxPages : 4));
     } else if (settings.lvqKey.empty()) {//LVQ already handled above
         queue->messages = std::auto_ptr<Messages>(new MessageDeque());
     }

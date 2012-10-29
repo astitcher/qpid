@@ -649,6 +649,8 @@ libqpidbroker_la_SOURCES = \
   qpid/broker/MessageStore.h \
   qpid/broker/MessageStoreModule.cpp \
   qpid/broker/MessageStoreModule.h \
+  qpid/broker/PagedQueue.h \
+  qpid/broker/PagedQueue.cpp \
   qpid/broker/PriorityQueue.h \
   qpid/broker/PriorityQueue.cpp \
   qpid/broker/Protocol.h \
