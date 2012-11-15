@@ -94,7 +94,7 @@ static class TCPIOPlugin : public Plugin {
             bool shouldListen = !sslMultiplexEnabled();
 
             ProtocolFactory::shared_ptr protocolt(
-                new AsynchIOProtocolFactory(opts, broker->getTimer(),shouldListen));
+                new AsynchIOProtocolFactory(opts, broker->getTimer(), shouldListen));
 
             if (shouldListen && protocolt->getPort()!=0 ) {
                 QPID_LOG(notice, "Listening on TCP/TCP6 port " << protocolt->getPort());
@@ -129,6 +129,46 @@ namespace {
         }
         return addresses;
     }
+
+    typedef boost::function0<Socket*> SocketFactory;
+    uint16_t listenTo(const std::vector<std::string>& interfaces, const std::string& port, int backlog,
+                      const SocketFactory& factory,
+                      /*out*/boost::ptr_vector<Socket>& listeners)
+    {
+        uint16_t listeningPort = 0;
+        std::vector<std::string> addresses = expandInterfaces(interfaces);
+        if (addresses.empty()) {
+            // We specified some interfaces, but couldn't find addresses for them
+            QPID_LOG(warning, "TCP/TCP6: No specified network interfaces found: Not Listening");
+            return listeningPort;
+        }
+
+        for (unsigned i = 0; i<addresses.size(); ++i) {
+            QPID_LOG(debug, "Using interface: " << addresses[i]);
+            SocketAddress sa(addresses[i], port);
+
+            // We must have at least one resolved address
+            QPID_LOG(info, "Listening to: " << sa.asString())
+            Socket* s = factory();
+            uint16_t lport = s->listen(sa, backlog);
+            QPID_LOG(debug, "Listened to: " << lport);
+            listeners.push_back(s);
+
+            listeningPort = lport;
+
+            // Try any other resolved addresses
+            while (sa.nextAddress()) {
+                // Hack to ensure that all listening connections are on the same port
+                sa.setAddrInfoPort(listeningPort);
+                QPID_LOG(info, "Listening to: " << sa.asString())
+                Socket* s = factory();
+                uint16_t lport = s->listen(sa, backlog);
+                QPID_LOG(debug, "Listened to: " << lport);
+                listeners.push_back(s);
+            }
+        }
+        return listeningPort;
+    }
 }
 
 AsynchIOProtocolFactory::AsynchIOProtocolFactory(const qpid::broker::Broker::Options& opts, Timer& timer, bool shouldListen) :
@@ -141,37 +181,9 @@ AsynchIOProtocolFactory::AsynchIOProtocolFactory(const qpid::broker::Broker::Opt
         return;
     }
 
-    std::vector<std::string> addresses = expandInterfaces(opts.listenInterfaces);
-    if (addresses.empty()) {
-        // We specified some interfaces, but couldn't find addresses for them
-        QPID_LOG(warning, "TCP/TCP6: No specified network interfaces found: Not Listening");
-        listeningPort = 0;
-    }
-
-    for (unsigned i = 0; i<addresses.size(); ++i) {
-        QPID_LOG(debug, "Using interface: " << addresses[i]);
-        SocketAddress sa(addresses[i], boost::lexical_cast<std::string>(opts.port));
-
-        // We must have at least one resolved address
-        QPID_LOG(info, "Listening to: " << sa.asString())
-        Socket* s = createSocket();
-        uint16_t lport = s->listen(sa, opts.connectionBacklog);
-        QPID_LOG(debug, "Listened to: " << lport);
-        listeners.push_back(s);
-
-        listeningPort = lport;
-
-        // Try any other resolved addresses
-        while (sa.nextAddress()) {
-            // Hack to ensure that all listening connections are on the same port
-            sa.setAddrInfoPort(listeningPort);
-            QPID_LOG(info, "Listening to: " << sa.asString())
-            Socket* s = createSocket();
-            uint16_t lport = s->listen(sa, opts.connectionBacklog);
-            QPID_LOG(debug, "Listened to: " << lport);
-            listeners.push_back(s);
-        }
-    }
+    listeningPort =
+        listenTo(opts.listenInterfaces, boost::lexical_cast<std::string>(opts.port), opts.connectionBacklog, 
+                 &createSocket, listeners);
 }
 
 void AsynchIOProtocolFactory::establishedIncoming(Poller::shared_ptr poller, const Socket& s,
