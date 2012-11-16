@@ -25,6 +25,7 @@
 #include "qpid/sys/IntegerTypes.h"
 #include "qpid/SharedObject.h"
 #include "qpid/sys/ConnectionCodec.h"
+#include <boost/ptr_container/ptr_vector.hpp>
 #include <boost/function.hpp>
 
 namespace qpid {
@@ -47,6 +48,12 @@ class ProtocolFactory : public qpid::SharedObject<ProtocolFactory>
         ConnectionCodec::Factory* codec,
         ConnectFailedCallback failed) = 0;
 };
+
+class Socket;
+typedef boost::function0<Socket*> SocketFactory;
+uint16_t listenTo(const std::vector<std::string>& interfaces, const std::string& port, int backlog,
+                  const SocketFactory& factory,
+                  /*out*/boost::ptr_vector<Socket>& listeners);
 
 inline ProtocolFactory::~ProtocolFactory() {}
 
