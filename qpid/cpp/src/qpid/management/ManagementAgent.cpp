@@ -213,8 +213,7 @@ void ManagementAgent::configure(const string& _dataDir, bool _publish, uint16_t 
 }
 
 void ManagementAgent::pluginsInitialized() {
-    // Do this here so cluster plugin has the chance to set up the timer.
-    timer          = &broker->getClusterTimer();
+    timer          = &broker->getTimer();
     timer->add(new Periodic(*this, interval));
 }
 

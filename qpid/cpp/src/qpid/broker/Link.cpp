@@ -541,7 +541,7 @@ bool Link::tryFailoverLH() {
 // Management updates for a link are inconsistent in a cluster, so they are
 // suppressed.
 bool Link::hideManagement() const {
-    return !mgmtObject || ( broker && broker->isInCluster());
+    return !mgmtObject;
 }
 
 // Allocate channel from link free pool

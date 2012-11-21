@@ -277,9 +277,7 @@ void Connection::notifyConnectionForced(const string& text)
 void Connection::setUserId(const string& userId)
 {
     ConnectionState::setUserId(userId);
-    // In a cluster, the cluster code will raise the connect event
-    // when the connection is replicated to the cluster.
-    if (!broker.isInCluster()) raiseConnectEvent();
+    raiseConnectEvent();
 }
 
 void Connection::raiseConnectEvent() {

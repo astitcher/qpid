@@ -216,8 +216,6 @@ Broker::Broker(const Broker::Options& conf) :
     queueCleaner(queues, &timer),
     recoveryInProgress(false),
     recovery(true),
-    inCluster(false),
-    clusterUpdatee(false),
     expiryPolicy(new ExpiryPolicy),
     getKnownBrokers(boost::bind(&Broker::getKnownBrokersImpl, this)),
     deferDelivery(boost::bind(&Broker::deferDeliveryImpl, this, _1, _2))
@@ -1068,12 +1066,6 @@ Broker::getKnownBrokersImpl()
 
 bool Broker::deferDeliveryImpl(const std::string&, const Message&)
 { return false; }
-
-void Broker::setClusterTimer(std::auto_ptr<sys::Timer> t) {
-    clusterTimer = t;
-    queueCleaner.setTimer(clusterTimer.get());
-    dtxManager.setTimer(*clusterTimer.get());
-}
 
 const std::string Broker::TCP_TRANSPORT("tcp");
 

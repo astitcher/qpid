@@ -158,7 +158,6 @@ class Broker : public sys::Runnable, public Plugin::Target,
                                             const ConnectionState* context);
     boost::shared_ptr<sys::Poller> poller;
     sys::Timer timer;
-    std::auto_ptr<sys::Timer> clusterTimer;
     Options config;
     std::auto_ptr<management::ManagementAgent> managementAgent;
     ProtocolFactoryMap protocolFactories;
@@ -185,7 +184,6 @@ class Broker : public sys::Runnable, public Plugin::Target,
     std::string federationTag;
     bool recoveryInProgress;
     bool recovery;
-    bool inCluster, clusterUpdatee;
     boost::intrusive_ptr<ExpiryPolicy> expiryPolicy;
     ConsumerFactories consumerFactories;
     ProtocolRegistry protocolRegistry;
@@ -278,10 +276,6 @@ class Broker : public sys::Runnable, public Plugin::Target,
     /** Timer for local tasks affecting only this broker */
     sys::Timer& getTimer() { return timer; }
 
-    /** Timer for tasks that must be synchronized if we are in a cluster */
-    sys::Timer& getClusterTimer() { return clusterTimer.get() ? *clusterTimer : timer; }
-    QPID_BROKER_EXTERN void setClusterTimer(std::auto_ptr<sys::Timer>);
-
     boost::function<std::vector<Url> ()> getKnownBrokers;
 
     static QPID_BROKER_EXTERN const std::string TCP_TRANSPORT;
@@ -289,18 +283,6 @@ class Broker : public sys::Runnable, public Plugin::Target,
     void setRecovery(bool set) { recovery = set; }
     bool getRecovery() const { return recovery; }
     bool inRecovery() const { return recoveryInProgress; }
-
-    /** True of this broker is part of a cluster.
-     * Only valid after early initialization of plugins is complete.
-     */
-    bool isInCluster() const { return inCluster; }
-    void setInCluster(bool set) { inCluster = set; }
-
-    /** True if this broker is joining a cluster and in the process of
-     * receiving a state update.
-     */
-    bool isClusterUpdatee() const { return clusterUpdatee; }
-    void setClusterUpdatee(bool set) { clusterUpdatee = set; }
 
     management::ManagementAgent* getManagementAgent() { return managementAgent.get(); }
 
