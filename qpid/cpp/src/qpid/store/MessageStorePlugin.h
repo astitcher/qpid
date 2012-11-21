@@ -24,7 +24,6 @@
 
 #include "qpid/Plugin.h"
 #include "qpid/Options.h"
-#include "qpid/broker/Broker.h"
 #include "qpid/broker/MessageStore.h"
 #include "qpid/broker/PersistableExchange.h"
 #include "qpid/broker/PersistableMessage.h"
@@ -36,6 +35,9 @@
 using namespace qpid;
 
 namespace qpid {
+namespace broker {
+class Broker;
+}
 namespace store {
 
 class StorageProvider;
