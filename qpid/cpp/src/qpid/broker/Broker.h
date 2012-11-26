@@ -106,6 +106,7 @@ class Broker : public sys::Runnable, public Plugin::Target,
         bool tcpNoDelay;
         bool requireEncrypted;
         std::string knownHosts;
+        bool nodict;                // disable SASL mechanisms susceptible to dictionary attacks
         std::string saslConfigPath;
         bool qmf2Support;
         bool qmf1Support;

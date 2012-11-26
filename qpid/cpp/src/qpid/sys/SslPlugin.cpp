@@ -68,10 +68,8 @@ class SslProtocolFactory : public ProtocolFactory {
     boost::ptr_vector<Socket> listeners;
     boost::ptr_vector<AsynchAcceptor> acceptors;
     Timer& brokerTimer;
-    uint32_t maxNegotiateTime;
+    const qpid::broker::Broker::Options& options;
     uint16_t listeningPort;
-    const bool tcpNoDelay;
-    bool nodict;
 
   public:
     SslProtocolFactory(const qpid::broker::Broker::Options& opts, const SslServerOptions& options,
@@ -82,12 +80,6 @@ class SslProtocolFactory : public ProtocolFactory {
                  ConnectFailedCallback);
 
     uint16_t getPort() const;
-
-  private:
-    void establishedIncoming(Poller::shared_ptr, const Socket&, ConnectionCodec::Factory*);
-    void establishedOutgoing(Poller::shared_ptr, const Socket&, ConnectionCodec::Factory*, const std::string&);
-    void establishedCommon(AsynchIOHandler*, Poller::shared_ptr , const Socket&);
-    void connectFailed(const Socket&, int, const std::string&, ConnectFailedCallback);
 };
 
 
@@ -104,7 +96,7 @@ static struct SslPlugin : public Plugin {
     void earlyInitialize(Target& target) {
         broker::Broker* broker = dynamic_cast<broker::Broker*>(&target);
         if (broker && !options.certDbPath.empty()) {
-            const broker::Broker::Options& opts = broker->getOptions();
+            broker::Broker::Options& opts = broker->getOptions();
 
             if (opts.port == options.port && // AMQP & AMQPS ports are the same
                 opts.port != 0) {
@@ -116,6 +108,9 @@ static struct SslPlugin : public Plugin {
                 options.multiplex = true;
                 options.addOptions()("ssl-multiplex", optValue(options.multiplex), "Allow SSL and non-SSL connections on the same port");
             }
+
+            // Set broker nodict option
+            opts.nodict = options.nodict;
         }
     }
 
@@ -134,7 +129,7 @@ static struct SslPlugin : public Plugin {
                     const broker::Broker::Options& opts = broker->getOptions();
 
                     ProtocolFactory::shared_ptr protocol(
-                        static_cast<ProtocolFactory*>(new SslProtocolFactory(opts, options, broker->getTimer())));
+                        new SslProtocolFactory(opts, options, broker->getTimer()));
 
                     if (protocol->getPort()!=0 ) {
                         QPID_LOG(notice, "Listening for " <<
@@ -153,54 +148,26 @@ static struct SslPlugin : public Plugin {
 } sslPlugin;
 
 namespace {
-    Socket* createSSLSocket(const SslServerOptions& options)
-    { return options.multiplex ?
-        new SslMuxSocket(options.certName, options.clientAuth) :
-        new SslSocket(options.certName, options.clientAuth);
+    Socket* createServerSSLSocket(const SslServerOptions& options) {
+        return options.multiplex ?
+            new SslMuxSocket(options.certName, options.clientAuth) :
+            new SslSocket(options.certName, options.clientAuth);
     }
+
+    Socket* createClientSSLSocket() {
+        return new SslSocket();
+    }
+
 }
 
 SslProtocolFactory::SslProtocolFactory(const qpid::broker::Broker::Options& opts, const SslServerOptions& options,
                                        Timer& timer) :
     brokerTimer(timer),
-    maxNegotiateTime(opts.maxNegotiateTime),
-    tcpNoDelay(opts.tcpNoDelay),
-    nodict(options.nodict)
+    options(opts)
 {
     listeningPort =
-    listenTo(opts.listenInterfaces, boost::lexical_cast<std::string>(opts.port), opts.connectionBacklog, 
-             boost::bind(&createSSLSocket, options), listeners);
-}
-
-void SslProtocolFactory::establishedIncoming(Poller::shared_ptr poller, const Socket& s,
-                                          ConnectionCodec::Factory* f) {
-    AsynchIOHandler* async = new AsynchIOHandler(broker::QPID_NAME_PREFIX+s.getFullAddress(), f, false, false);
-    establishedCommon(async, poller, s);
-}
-
-void SslProtocolFactory::establishedOutgoing(Poller::shared_ptr poller, const Socket& s,
-                                             ConnectionCodec::Factory* f, const std::string& name) {
-    AsynchIOHandler* async = new AsynchIOHandler(name, f, true, false);
-    establishedCommon(async, poller, s);
-}
-
-void SslProtocolFactory::establishedCommon(AsynchIOHandler* async, Poller::shared_ptr poller, const Socket& s) {
-    if (tcpNoDelay) {
-        s.setTcpNoDelay();
-        QPID_LOG(info, "Set TCP_NODELAY on connection to " << s.getPeerAddress());
-    }
-
-    AsynchIO* aio = AsynchIO::create(
-        s,
-        boost::bind(&AsynchIOHandler::readbuff, async, _1, _2),
-        boost::bind(&AsynchIOHandler::eof, async, _1),
-        boost::bind(&AsynchIOHandler::disconnect, async, _1),
-        boost::bind(&AsynchIOHandler::closedSocket, async, _1, _2),
-        boost::bind(&AsynchIOHandler::nobuffs, async, _1),
-        boost::bind(&AsynchIOHandler::idle, async, _1));
-
-    async->init(aio, brokerTimer, maxNegotiateTime);
-    aio->start(poller);
+    listenTo(opts.listenInterfaces, boost::lexical_cast<std::string>(options.port), opts.connectionBacklog,
+             boost::bind(&createServerSSLSocket, options), listeners);
 }
 
 uint16_t SslProtocolFactory::getPort() const {
@@ -212,18 +179,9 @@ void SslProtocolFactory::accept(Poller::shared_ptr poller,
     for (unsigned i = 0; i<listeners.size(); ++i) {
         acceptors.push_back(
             AsynchAcceptor::create(listeners[i],
-                            boost::bind(&SslProtocolFactory::establishedIncoming, this, poller, _1, fact)));
+                            boost::bind(&establishedIncoming, poller, options, &brokerTimer, _1, fact)));
         acceptors[i].start(poller);
     }
-}
-
-void SslProtocolFactory::connectFailed(
-    const Socket& s, int ec, const std::string& emsg,
-    ConnectFailedCallback failedCb)
-{
-    failedCb(ec, emsg);
-    s.close();
-    delete &s;
 }
 
 void SslProtocolFactory::connect(
@@ -233,29 +191,7 @@ void SslProtocolFactory::connect(
     ConnectionCodec::Factory* fact,
     ConnectFailedCallback failed)
 {
-    // Note that the following logic does not cause a memory leak.
-    // The allocated Socket is freed either by the SslConnector
-    // upon connection failure or by the SslIoHandle upon connection
-    // shutdown.  The allocated SslConnector frees itself when it
-    // is no longer needed.
-
-    Socket* socket = new qpid::sys::ssl::SslSocket();
-    try {
-    AsynchConnector* c = AsynchConnector::create(
-        *socket,
-        host,
-        port,
-        boost::bind(&SslProtocolFactory::establishedOutgoing,
-                    this, poller, _1, fact, name),
-        boost::bind(&SslProtocolFactory::connectFailed,
-                    this, _1, _2, _3, failed));
-    c->start(poller);
-    } catch (std::exception&) {
-        // TODO: Design question - should we do the error callback and also throw?
-        int errCode = socket->getError();
-        connectFailed(*socket, errCode, strError(errCode), failed);
-        throw;
-    }
+    qpid::sys::connect(poller, options, &brokerTimer, &createClientSSLSocket, name, host, port, fact, failed);
 }
 
 }} // namespace qpid::sys

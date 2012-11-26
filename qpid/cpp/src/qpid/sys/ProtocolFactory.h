@@ -22,8 +22,9 @@
  *
  */
 
-#include "qpid/sys/IntegerTypes.h"
 #include "qpid/SharedObject.h"
+#include "qpid/broker/Broker.h"
+#include "qpid/sys/IntegerTypes.h"
 #include "qpid/sys/ConnectionCodec.h"
 #include <boost/ptr_container/ptr_vector.hpp>
 #include <boost/function.hpp>
@@ -49,14 +50,29 @@ class ProtocolFactory : public qpid::SharedObject<ProtocolFactory>
         ConnectFailedCallback failed) = 0;
 };
 
+inline ProtocolFactory::~ProtocolFactory() {}
+
 class Socket;
 typedef boost::function0<Socket*> SocketFactory;
 uint16_t listenTo(const std::vector<std::string>& interfaces, const std::string& port, int backlog,
                   const SocketFactory& factory,
                   /*out*/boost::ptr_vector<Socket>& listeners);
 
-inline ProtocolFactory::~ProtocolFactory() {}
+void establishedIncoming(boost::shared_ptr<Poller>, const qpid::broker::Broker::Options& opts, Timer* timer,
+                         const Socket& s, ConnectionCodec::Factory* f);
 
+void establishedOutgoing(boost::shared_ptr<Poller>, const qpid::broker::Broker::Options& opts, Timer* timer,
+                         const Socket& s, ConnectionCodec::Factory* f, const std::string& name);
+
+void connectFailed(const Socket&, int, const std::string&, ProtocolFactory::ConnectFailedCallback);
+
+void connect(
+    boost::shared_ptr<Poller> poller, const qpid::broker::Broker::Options& opts, Timer* timer,
+    const SocketFactory& factory,
+    const std::string& name,
+    const std::string& host, const std::string& port,
+    ConnectionCodec::Factory* fact,
+    ProtocolFactory::ConnectFailedCallback failed);
 }}
 
 

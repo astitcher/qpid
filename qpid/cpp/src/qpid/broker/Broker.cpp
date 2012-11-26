@@ -135,6 +135,7 @@ Broker::Options::Options(const std::string& name) :
     tcpNoDelay(false),
     requireEncrypted(false),
     knownHosts(knownHostsNone),
+    nodict(false),
     qmf2Support(true),
     qmf1Support(true),
     queueFlowStopRatio(80),
