@@ -23,15 +23,10 @@
 
 #include "qpid/Plugin.h"
 #include "qpid/broker/Broker.h"
-#include "qpid/broker/NameGenerator.h"
 #include "qpid/log/Statement.h"
-#include "qpid/sys/AsynchIOHandler.h"
 #include "qpid/sys/AsynchIO.h"
 #include "qpid/sys/ssl/util.h"
 #include "qpid/sys/ssl/SslSocket.h"
-#include "qpid/sys/SocketAddress.h"
-#include "qpid/sys/SystemInfo.h"
-#include "qpid/sys/Poller.h"
 
 #include <boost/bind.hpp>
 #include <boost/ptr_container/ptr_vector.hpp>
@@ -74,8 +69,8 @@ class SslProtocolFactory : public ProtocolFactory {
   public:
     SslProtocolFactory(const qpid::broker::Broker::Options& opts, const SslServerOptions& options,
                        Timer& timer);
-    void accept(Poller::shared_ptr, ConnectionCodec::Factory*);
-    void connect(Poller::shared_ptr, const std::string& name, const std::string& host, const std::string& port,
+    void accept(boost::shared_ptr<Poller>, ConnectionCodec::Factory*);
+    void connect(boost::shared_ptr<Poller>, const std::string& name, const std::string& host, const std::string& port,
                  ConnectionCodec::Factory*,
                  ConnectFailedCallback);
 
@@ -174,7 +169,7 @@ uint16_t SslProtocolFactory::getPort() const {
     return listeningPort; // Immutable no need for lock.
 }
 
-void SslProtocolFactory::accept(Poller::shared_ptr poller,
+void SslProtocolFactory::accept(boost::shared_ptr<Poller> poller,
                                 ConnectionCodec::Factory* fact) {
     for (unsigned i = 0; i<listeners.size(); ++i) {
         acceptors.push_back(
@@ -185,7 +180,7 @@ void SslProtocolFactory::accept(Poller::shared_ptr poller,
 }
 
 void SslProtocolFactory::connect(
-    Poller::shared_ptr poller,
+    boost::shared_ptr<Poller> poller,
     const std::string& name,
     const std::string& host, const std::string& port,
     ConnectionCodec::Factory* fact,
