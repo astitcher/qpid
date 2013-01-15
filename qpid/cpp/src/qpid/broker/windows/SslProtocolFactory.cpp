@@ -7,9 +7,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- * 
+ *
  *   http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -74,7 +74,7 @@ struct SslServerOptions : qpid::Options
              "Local store name location for certificates ( CurrentUser | LocalMachine | CurrentService )")
             ("ssl-cert-name", optValue(certName, "NAME"), "Name of the certificate to use")
             ("ssl-port", optValue(port, "PORT"), "Port on which to listen for SSL connections")
-            ("ssl-require-client-authentication", optValue(clientAuth), 
+            ("ssl-require-client-authentication", optValue(clientAuth),
              "Forces clients to authenticate in order to establish an SSL connection");
     }
 };
@@ -119,7 +119,7 @@ static struct SslPlugin : public Plugin {
 
     void earlyInitialize(Target&) {
     }
-    
+
     void initialize(Target& target) {
         broker::Broker* broker = dynamic_cast<broker::Broker*>(&target);
         // Only provide to a Broker
@@ -273,7 +273,7 @@ void SslProtocolFactory::establishedIncoming(sys::Poller::shared_ptr poller,
                                              sys::ConnectionCodec::Factory* f) {
     sys::AsynchIOHandler* async = new sys::AsynchIOHandler(s.getFullAddress(), f, false, false);
 
-    sys::AsynchIO *aio = 
+    sys::AsynchIO *aio =
         new qpid::sys::windows::ServerSslAsynchIO(
             clientAuthSelected,
             s,
@@ -294,7 +294,7 @@ void SslProtocolFactory::establishedOutgoing(sys::Poller::shared_ptr poller,
                                              std::string& name) {
     sys::AsynchIOHandler* async = new sys::AsynchIOHandler(name, f, true, false);
 
-    sys::AsynchIO *aio = 
+    sys::AsynchIO *aio =
         new qpid::sys::windows::ClientSslAsynchIO(
             brokerHost,
             s,
@@ -376,4 +376,4 @@ void SslProtocolFactory::connect(sys::Poller::shared_ptr poller,
                                         this, _1, _2, _3));
 }
 
-}}} // namespace qpid::sys::windows
+
