@@ -60,11 +60,7 @@ struct SslServerOptions : ssl::SslOptions
 };
 
 class SslProtocolFactory : public ProtocolFactory {
-    boost::ptr_vector<Socket> listeners;
-    boost::ptr_vector<AsynchAcceptor> acceptors;
-    Timer& brokerTimer;
-    const qpid::broker::Broker::Options& options;
-    uint16_t listeningPort;
+    ServerListener socketListener;
 
   public:
     SslProtocolFactory(const qpid::broker::Broker::Options& opts, const SslServerOptions& options,
@@ -103,9 +99,6 @@ static struct SslPlugin : public Plugin {
                 options.multiplex = true;
                 options.addOptions()("ssl-multiplex", optValue(options.multiplex), "Allow SSL and non-SSL connections on the same port");
             }
-
-            // Set broker nodict option
-            opts.nodict = options.nodict;
         }
     }
 
@@ -157,26 +150,19 @@ namespace {
 
 SslProtocolFactory::SslProtocolFactory(const qpid::broker::Broker::Options& opts, const SslServerOptions& options,
                                        Timer& timer) :
-    brokerTimer(timer),
-    options(opts)
+    socketListener(opts.tcpNoDelay, options.nodict, opts.maxNegotiateTime, timer)
 {
-    listeningPort =
-    listenTo(opts.listenInterfaces, boost::lexical_cast<std::string>(options.port), opts.connectionBacklog,
-             boost::bind(&createServerSSLSocket, options), listeners);
+    socketListener.listen(opts.listenInterfaces, boost::lexical_cast<std::string>(options.port), opts.connectionBacklog,
+            boost::bind(&createServerSSLSocket, options));
 }
 
 uint16_t SslProtocolFactory::getPort() const {
-    return listeningPort; // Immutable no need for lock.
+    return socketListener.getPort();
 }
 
 void SslProtocolFactory::accept(boost::shared_ptr<Poller> poller,
                                 ConnectionCodec::Factory* fact) {
-    for (unsigned i = 0; i<listeners.size(); ++i) {
-        acceptors.push_back(
-            AsynchAcceptor::create(listeners[i],
-                            boost::bind(&establishedIncoming, poller, options, &brokerTimer, _1, fact)));
-        acceptors[i].start(poller);
-    }
+    socketListener.accept(poller, fact);
 }
 
 void SslProtocolFactory::connect(
@@ -186,7 +172,7 @@ void SslProtocolFactory::connect(
     ConnectionCodec::Factory* fact,
     ConnectFailedCallback failed)
 {
-    qpid::sys::connect(poller, options, &brokerTimer, &createClientSSLSocket, name, host, port, fact, failed);
+    socketListener.connect(poller, name, host, port, fact, failed, &createClientSSLSocket);
 }
 
 }} // namespace qpid::sys

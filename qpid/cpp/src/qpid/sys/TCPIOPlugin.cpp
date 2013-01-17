@@ -36,10 +36,7 @@ namespace sys {
 class Timer;
 
 class AsynchIOProtocolFactory : public ProtocolFactory {
-    boost::ptr_vector<Socket> listeners;
-    boost::ptr_vector<AsynchAcceptor> acceptors;
-    Timer& brokerTimer;
-    const qpid::broker::Broker::Options& options;
+    ServerListener socketListener;
     uint16_t listeningPort;
 
   public:
@@ -94,17 +91,17 @@ static class TCPIOPlugin : public Plugin {
 } tcpPlugin;
 
 AsynchIOProtocolFactory::AsynchIOProtocolFactory(const qpid::broker::Broker::Options& opts, Timer& timer, bool shouldListen) :
-    brokerTimer(timer),
-    options(opts)
+    socketListener(opts.tcpNoDelay, false, opts.maxNegotiateTime, timer)
 {
     if (!shouldListen) {
         listeningPort = boost::lexical_cast<uint16_t>(opts.port);
         return;
     }
 
-    listeningPort =
-        listenTo(opts.listenInterfaces, boost::lexical_cast<std::string>(opts.port), opts.connectionBacklog, 
-                 &createSocket, listeners);
+    socketListener.listen(opts.listenInterfaces, boost::lexical_cast<std::string>(opts.port), opts.connectionBacklog, 
+                &createSocket);
+
+    listeningPort = socketListener.getPort();
 }
 
 uint16_t AsynchIOProtocolFactory::getPort() const {
@@ -113,12 +110,7 @@ uint16_t AsynchIOProtocolFactory::getPort() const {
 
 void AsynchIOProtocolFactory::accept(boost::shared_ptr<Poller> poller,
                                      ConnectionCodec::Factory* fact) {
-    for (unsigned i = 0; i<listeners.size(); ++i) {
-        acceptors.push_back(
-            AsynchAcceptor::create(listeners[i],
-                                   boost::bind(&establishedIncoming, poller, options, &brokerTimer, _1, fact)));
-        acceptors[i].start(poller);
-    }
+    socketListener.accept(poller, fact);
 }
                                      
 void AsynchIOProtocolFactory::connect(
@@ -128,7 +120,7 @@ void AsynchIOProtocolFactory::connect(
     ConnectionCodec::Factory* fact,
     ConnectFailedCallback failed)
 {
-    qpid::sys::connect(poller, options, &brokerTimer, &createSocket, name, host, port, fact, failed);
+    socketListener.connect(poller, name, host, port, fact, failed, &createSocket);
 }
 
 }} // namespace qpid::sys
