@@ -90,7 +90,7 @@
 #include <memory>
 
 using qpid::sys::TransportAcceptor;
-using qpid::sys::TransportConnectorFactory;
+using qpid::sys::TransportConnector;
 using qpid::sys::Poller;
 using qpid::sys::Dispatcher;
 using qpid::sys::Thread;
@@ -1028,7 +1028,7 @@ uint16_t Broker::getPort(const std::string& name) const  {
     }
 }
 
-void Broker::registerTransport(const std::string& name, boost::shared_ptr<TransportAcceptor> a, boost::shared_ptr<TransportConnectorFactory> c, uint16_t p) {
+void Broker::registerTransport(const std::string& name, boost::shared_ptr<TransportAcceptor> a, boost::shared_ptr<TransportConnector> c, uint16_t p) {
     transportMap[name] = TransportInfo(a, c, p);
 }
 
@@ -1043,7 +1043,7 @@ void Broker::connect(
     const std::string& host, const std::string& port, const std::string& transport,
     boost::function2<void, int, std::string> failed)
 {
-    boost::shared_ptr<TransportConnectorFactory> tcf = getTransportInfo(transport).connectorFactory;
+    boost::shared_ptr<TransportConnector> tcf = getTransportInfo(transport).connectorFactory;
     if (tcf) tcf->connect(poller, name, host, port, factory.get(), failed);
     else throw NoSuchTransportException(QPID_MSG("Unsupported transport type: " << transport));
 }

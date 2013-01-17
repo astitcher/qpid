@@ -52,7 +52,7 @@ namespace qpid {
 
 namespace sys {
 class TransportAcceptor;
-class TransportConnectorFactory;
+class TransportConnector;
 class Poller;
 class Timer;
 }
@@ -127,14 +127,14 @@ class Broker : public sys::Runnable, public Plugin::Target,
   private:
     struct TransportInfo {
         boost::shared_ptr<sys::TransportAcceptor> acceptor;
-        boost::shared_ptr<sys::TransportConnectorFactory> connectorFactory;
+        boost::shared_ptr<sys::TransportConnector> connectorFactory;
         uint16_t port;
 
         TransportInfo() :
             port(0)
         {}
 
-        TransportInfo(boost::shared_ptr<sys::TransportAcceptor> a, boost::shared_ptr<sys::TransportConnectorFactory> c, uint16_t p) :
+        TransportInfo(boost::shared_ptr<sys::TransportAcceptor> a, boost::shared_ptr<sys::TransportConnector> c, uint16_t p) :
             acceptor(a),
             connectorFactory(c),
             port(p)
@@ -246,7 +246,7 @@ class Broker : public sys::Runnable, public Plugin::Target,
     /** Add to the broker's protocolFactorys */
     QPID_BROKER_EXTERN void registerTransport(
         const std::string& name,
-        boost::shared_ptr<sys::TransportAcceptor>, boost::shared_ptr<sys::TransportConnectorFactory>,
+        boost::shared_ptr<sys::TransportAcceptor>, boost::shared_ptr<sys::TransportConnector>,
         uint16_t port);
     
     /** Accept connections */

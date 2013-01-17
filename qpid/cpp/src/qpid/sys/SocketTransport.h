@@ -22,6 +22,8 @@
  *
  */
 
+#include "qpid/sys/TransportFactory.h"
+
 #include "qpid/sys/IntegerTypes.h"
 #include "qpid/sys/ConnectionCodec.h"
 #include <boost/ptr_container/ptr_vector.hpp>
@@ -48,35 +50,34 @@ struct SocketTransportOptions {
     {}
 };
 
-class SocketAcceptor {
+class SocketAcceptor : public TransportAcceptor {
     boost::ptr_vector<Socket> listeners;
     boost::ptr_vector<AsynchAcceptor> acceptors;
     Timer& timer;
+    const SocketFactory factory;
     SocketTransportOptions options;
 
 public:
-    SocketAcceptor(bool tcpNoDelay, bool nodict, uint32_t maxNegotiateTime, Timer& timer);
+    SocketAcceptor(bool tcpNoDelay, bool nodict, uint32_t maxNegotiateTime, Timer& timer, const SocketFactory& factory);
 
-    uint16_t listen(const std::vector<std::string>& interfaces, const std::string& port, int backlog,
-                    const SocketFactory& factory);
+    uint16_t listen(const std::vector<std::string>& interfaces, const std::string& port, int backlog);
 
     void accept(boost::shared_ptr<Poller> poller, ConnectionCodec::Factory* f);
 };
 
-class SocketConnector {
+class SocketConnector : public TransportConnector {
     Timer& timer;
+    const SocketFactory factory;
     SocketTransportOptions options;
     
 public:
-    SocketConnector(bool tcpNoDelay, bool nodict, uint32_t maxNegotiateTime, Timer& timer);
+    SocketConnector(bool tcpNoDelay, bool nodict, uint32_t maxNegotiateTime, Timer& timer, const SocketFactory& factory);
     
-    typedef boost::function2<void, int, std::string> ConnectFailedCallback;
     void connect(boost::shared_ptr<Poller> poller,
                  const std::string& name,
                  const std::string& host, const std::string& port,
                  ConnectionCodec::Factory* f,
-                 ConnectFailedCallback failed,
-                 const SocketFactory& factory);
+                 ConnectFailedCallback failed);
 };
 
 }}

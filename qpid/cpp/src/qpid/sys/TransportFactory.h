@@ -44,12 +44,12 @@ class TransportAcceptor : public qpid::SharedObject<TransportAcceptor>
 
 inline TransportAcceptor::~TransportAcceptor() {}
 
-class TransportConnectorFactory : public qpid::SharedObject<TransportConnectorFactory>
+class TransportConnector : public qpid::SharedObject<TransportConnector>
 {
 public:
     typedef boost::function2<void, int, std::string> ConnectFailedCallback;
     
-    virtual ~TransportConnectorFactory() = 0;
+    virtual ~TransportConnector() = 0;
     virtual void connect(
         boost::shared_ptr<Poller>,
         const std::string& name,
@@ -58,7 +58,7 @@ public:
         ConnectFailedCallback failed) = 0;
 };
 
-inline TransportConnectorFactory::~TransportConnectorFactory() {}
+inline TransportConnector::~TransportConnector() {}
 
 }}
 

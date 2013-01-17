@@ -108,13 +108,13 @@ namespace {
     }
 }
 
-SocketAcceptor::SocketAcceptor(bool tcpNoDelay, bool nodict, uint32_t maxNegotiateTime, Timer& timer0) :
+SocketAcceptor::SocketAcceptor(bool tcpNoDelay, bool nodict, uint32_t maxNegotiateTime, Timer& timer0, const SocketFactory& factory0) :
     timer(timer0),
+    factory(factory0),
     options(tcpNoDelay, nodict, maxNegotiateTime)
 {}
 
-uint16_t SocketAcceptor::listen(const std::vector<std::string>& interfaces, const std::string& port, int backlog,
-                                const SocketFactory& factory)
+uint16_t SocketAcceptor::listen(const std::vector<std::string>& interfaces, const std::string& port, int backlog)
 {
     std::vector<std::string> addresses = expandInterfaces(interfaces);
     if (addresses.empty()) {
@@ -161,8 +161,9 @@ void SocketAcceptor::accept(boost::shared_ptr<Poller> poller, ConnectionCodec::F
     }
 }
 
-SocketConnector::SocketConnector(bool tcpNoDelay, bool nodict, uint32_t maxNegotiateTime, Timer& timer0) :
+SocketConnector::SocketConnector(bool tcpNoDelay, bool nodict, uint32_t maxNegotiateTime, Timer& timer0, const SocketFactory& factory0) :
     timer(timer0),
+    factory(factory0),
     options(tcpNoDelay, nodict, maxNegotiateTime)
 {}
 
@@ -171,8 +172,7 @@ void SocketConnector::connect(
     const std::string& name,
     const std::string& host, const std::string& port,
     ConnectionCodec::Factory* fact,
-    ConnectFailedCallback failed,
-    const SocketFactory& factory)
+    ConnectFailedCallback failed)
 {
     // Note that the following logic does not cause a memory leak.
     // The allocated Socket is freed either by the AsynchConnector

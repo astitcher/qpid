@@ -34,28 +34,6 @@
 namespace qpid {
 namespace sys {
 
-class Timer;
-
-class AsynchIOAcceptor : public TransportAcceptor {
-    SocketAcceptor socketListener;
-
-  public:
-    AsynchIOAcceptor(const qpid::broker::Broker::Options& opts, Timer& timer);
-    uint16_t listen(const std::vector<std::string>& interfaces, const std::string& port, int backlog);
-    void accept(boost::shared_ptr<Poller>, ConnectionCodec::Factory*);
-};
-
-class AsynchIOConnector : public TransportConnectorFactory {
-    SocketConnector socketConnector;
-    
-public:
-    AsynchIOConnector(const qpid::broker::Broker::Options& opts, Timer& timer);
-    void connect(boost::shared_ptr<Poller>, const std::string& name,
-                 const std::string& host, const std::string& port,
-                 ConnectionCodec::Factory*,
-                 ConnectFailedCallback);
-};
-
 static bool sslMultiplexEnabled(void)
 {
     Options o;
@@ -87,7 +65,7 @@ static class TCPIOPlugin : public Plugin {
             uint16_t port = opts.port;
             TransportAcceptor::shared_ptr ta;
             if (shouldListen) {
-                AsynchIOAcceptor* aa = new AsynchIOAcceptor(opts, broker->getTimer());
+                SocketAcceptor* aa = new SocketAcceptor(opts.tcpNoDelay, false, opts.maxNegotiateTime, broker->getTimer(), &createSocket);
                 ta.reset(aa);
                 port = aa->listen(opts.listenInterfaces, boost::lexical_cast<std::string>(opts.port), opts.connectionBacklog);
                 if ( port!=0 ) {
@@ -95,41 +73,11 @@ static class TCPIOPlugin : public Plugin {
                 }
             }
 
-            TransportConnectorFactory::shared_ptr tc(new AsynchIOConnector(opts, broker->getTimer()));
+            TransportConnector::shared_ptr tc(new SocketConnector(opts.tcpNoDelay, false, opts.maxNegotiateTime, broker->getTimer(), &createSocket));
             
             broker->registerTransport("tcp", ta, tc, port);
         }
     }
 } tcpPlugin;
-
-AsynchIOAcceptor::AsynchIOAcceptor(const qpid::broker::Broker::Options& opts, Timer& timer) :
-    socketListener(opts.tcpNoDelay, false, opts.maxNegotiateTime, timer)
-{
-}
-
-uint16_t AsynchIOAcceptor::listen(const std::vector< std::string >& interfaces, const std::string& port, int backlog)
-{
-    return socketListener.listen(interfaces, port, backlog, &createSocket);
-}
-
-void AsynchIOAcceptor::accept(boost::shared_ptr<Poller> poller,
-                                     ConnectionCodec::Factory* fact) {
-    socketListener.accept(poller, fact);
-}
-                                     
-AsynchIOConnector::AsynchIOConnector(const qpid::broker::Broker::Options& opts, Timer& timer) :
-    socketConnector(opts.tcpNoDelay, false, opts.maxNegotiateTime, timer)
-{
-}
-
-void AsynchIOConnector::connect(
-    boost::shared_ptr<Poller> poller,
-    const std::string& name,
-    const std::string& host, const std::string& port,
-    ConnectionCodec::Factory* fact,
-    ConnectFailedCallback failed)
-{
-    socketConnector.connect(poller, name, host, port, fact, failed, &createSocket);
-}
 
 }} // namespace qpid::sys

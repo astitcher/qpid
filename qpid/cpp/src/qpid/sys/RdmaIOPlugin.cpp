@@ -239,7 +239,7 @@ void RdmaIOHandler::initProtocolIn(Rdma::Buffer* buff) {
     }
 }
 
-class RdmaIOProtocolFactory : public TransportAcceptor, public TransportConnectorFactory {
+class RdmaIOProtocolFactory : public TransportAcceptor, public TransportConnector {
     auto_ptr<Rdma::Listener> listener;
     const uint16_t listeningPort;
 
