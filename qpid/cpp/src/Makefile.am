@@ -756,8 +756,9 @@ libqpidbroker_la_SOURCES = \
   qpid/management/ManagementTopicExchange.cpp \
   qpid/management/ManagementTopicExchange.h \
   qpid/sys/TCPIOPlugin.cpp \
-  qpid/sys/ProtocolFactory.cpp \
-  qpid/sys/ProtocolFactory.h
+  qpid/sys/SocketTransport.cpp \
+  qpid/sys/SocketTransport.h \
+  qpid/sys/TransportFactory.h
 
 QPIDBROKER_VERSION_INFO = 2:0:0
 libqpidbroker_la_LDFLAGS = -version-info $(QPIDBROKER_VERSION_INFO)

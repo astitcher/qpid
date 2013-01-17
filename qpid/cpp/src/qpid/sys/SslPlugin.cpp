@@ -19,12 +19,13 @@
  *
  */
 
-#include "qpid/sys/ProtocolFactory.h"
+#include "qpid/sys/TransportFactory.h"
 
 #include "qpid/Plugin.h"
 #include "qpid/broker/Broker.h"
 #include "qpid/log/Statement.h"
 #include "qpid/sys/AsynchIO.h"
+#include "qpid/sys/SocketTransport.h"
 #include "qpid/sys/ssl/util.h"
 #include "qpid/sys/ssl/SslSocket.h"
 

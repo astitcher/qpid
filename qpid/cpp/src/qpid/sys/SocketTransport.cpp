@@ -19,7 +19,7 @@
  *
  */
 
-#include "qpid/sys/ProtocolFactory.h"
+#include "qpid/sys/SocketTransport.h"
 
 #include "qpid/broker/NameGenerator.h"
 #include "qpid/log/Statement.h"
@@ -76,7 +76,7 @@ namespace {
 
     void connectFailed(
         const Socket& s, int ec, const std::string& emsg,
-        TransportConnectorFactory::ConnectFailedCallback failedCb)
+        SocketConnector::ConnectFailedCallback failedCb)
     {
         failedCb(ec, emsg);
         s.close();
@@ -171,7 +171,7 @@ void SocketConnector::connect(
     const std::string& name,
     const std::string& host, const std::string& port,
     ConnectionCodec::Factory* fact,
-    TransportConnectorFactory::ConnectFailedCallback failed,
+    ConnectFailedCallback failed,
     const SocketFactory& factory)
 {
     // Note that the following logic does not cause a memory leak.

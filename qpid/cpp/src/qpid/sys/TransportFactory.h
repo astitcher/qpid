@@ -1,5 +1,5 @@
-#ifndef _sys_ProtocolFactory_h
-#define _sys_ProtocolFactory_h
+#ifndef QPID_SYS_TRANSPORTFACTORY_H
+#define QPID_SYS_TRANSPORTFACTORY_H
 
 /*
  *
@@ -23,10 +23,10 @@
  */
 
 #include "qpid/SharedObject.h"
-#include "qpid/sys/IntegerTypes.h"
 #include "qpid/sys/ConnectionCodec.h"
-#include <boost/ptr_container/ptr_vector.hpp>
+#include <string>
 #include <boost/function.hpp>
+#include <boost/shared_ptr.hpp>
 
 namespace qpid {
 namespace sys {
@@ -60,54 +60,6 @@ public:
 
 inline TransportConnectorFactory::~TransportConnectorFactory() {}
 
-class Socket;
-typedef boost::function0<Socket*> SocketFactory;
-
-struct SocketTransportOptions {
-    bool tcpNoDelay;
-    bool nodict;
-    uint32_t maxNegotiateTime;
-
-    SocketTransportOptions(bool t, bool d, uint32_t m) :
-        tcpNoDelay(t),
-        nodict(d),
-        maxNegotiateTime(m)
-    {}
-};
-
-class SocketAcceptor {
-    boost::ptr_vector<Socket> listeners;
-    boost::ptr_vector<AsynchAcceptor> acceptors;
-    Timer& timer;
-    SocketTransportOptions options;
-
-public:
-    SocketAcceptor(bool tcpNoDelay, bool nodict, uint32_t maxNegotiateTime, Timer& timer);
-
-    uint16_t listen(const std::vector<std::string>& interfaces, const std::string& port, int backlog,
-                    const SocketFactory& factory);
-
-    void accept(boost::shared_ptr<Poller> poller, ConnectionCodec::Factory* f);
-};
-
-class SocketConnector {
-    boost::ptr_vector<Socket> listeners;
-    boost::ptr_vector<AsynchAcceptor> acceptors;
-    Timer& timer;
-    uint16_t listeningPort;
-    SocketTransportOptions options;
-    
-public:
-    SocketConnector(bool tcpNoDelay, bool nodict, uint32_t maxNegotiateTime, Timer& timer);
-    
-    void connect(boost::shared_ptr<Poller> poller,
-                 const std::string& name,
-                 const std::string& host, const std::string& port,
-                 ConnectionCodec::Factory* f,
-                 TransportConnectorFactory::ConnectFailedCallback failed,
-                 const SocketFactory& factory);
-};
-
 }}
 
-#endif  //!_sys_ProtocolFactory_h
+#endif

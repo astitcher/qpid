@@ -19,13 +19,14 @@
  *
  */
 
-#include "qpid/sys/ProtocolFactory.h"
+#include "qpid/sys/TransportFactory.h"
 
 #include "qpid/Plugin.h"
 #include "qpid/broker/Broker.h"
 #include "qpid/log/Statement.h"
 #include "qpid/sys/AsynchIO.h"
 #include "qpid/sys/Socket.h"
+#include "qpid/sys/SocketTransport.h"
 
 #include <boost/bind.hpp>
 #include <boost/ptr_container/ptr_vector.hpp>

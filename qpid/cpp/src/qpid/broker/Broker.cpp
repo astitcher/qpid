@@ -68,7 +68,7 @@
 #include "qpid/framing/ProtocolInitiation.h"
 #include "qpid/framing/reply_exceptions.h"
 #include "qpid/framing/Uuid.h"
-#include "qpid/sys/ProtocolFactory.h"
+#include "qpid/sys/TransportFactory.h"
 #include "qpid/sys/Poller.h"
 #include "qpid/sys/Dispatcher.h"
 #include "qpid/sys/Thread.h"
