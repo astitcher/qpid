@@ -37,7 +37,7 @@ namespace sys {
 namespace {
     void establishedCommon(
         AsynchIOHandler* async,
-        boost::shared_ptr<Poller> poller, const ServerListenerOptions& opts, Timer* timer,
+        boost::shared_ptr<Poller> poller, const SocketTransportOptions& opts, Timer* timer,
         const Socket& s)
     {
         if (opts.tcpNoDelay) {
@@ -59,7 +59,7 @@ namespace {
     }
 
     void establishedIncoming(
-        boost::shared_ptr<Poller> poller, const ServerListenerOptions& opts, Timer* timer,
+        boost::shared_ptr<Poller> poller, const SocketTransportOptions& opts, Timer* timer,
         const Socket& s, ConnectionCodec::Factory* f)
     {
         AsynchIOHandler* async = new AsynchIOHandler(broker::QPID_NAME_PREFIX+s.getFullAddress(), f, false, opts.nodict);
@@ -67,7 +67,7 @@ namespace {
     }
 
     void establishedOutgoing(
-        boost::shared_ptr<Poller> poller, const ServerListenerOptions& opts, Timer* timer,
+        boost::shared_ptr<Poller> poller, const SocketTransportOptions& opts, Timer* timer,
         const Socket& s, ConnectionCodec::Factory* f, const std::string& name)
     {
         AsynchIOHandler* async = new AsynchIOHandler(name, f, true, opts.nodict);
@@ -76,7 +76,7 @@ namespace {
 
     void connectFailed(
         const Socket& s, int ec, const std::string& emsg,
-        ProtocolFactory::ConnectFailedCallback failedCb)
+        TransportConnectorFactory::ConnectFailedCallback failedCb)
     {
         failedCb(ec, emsg);
         s.close();
@@ -108,22 +108,22 @@ namespace {
     }
 }
 
-ServerListener::ServerListener(bool tcpNoDelay, bool nodict, uint32_t maxNegotiateTime, Timer& timer0) :
+SocketAcceptor::SocketAcceptor(bool tcpNoDelay, bool nodict, uint32_t maxNegotiateTime, Timer& timer0) :
     timer(timer0),
     options(tcpNoDelay, nodict, maxNegotiateTime)
 {}
 
-void ServerListener::listen(const std::vector<std::string>& interfaces, const std::string& port, int backlog,
-                  const SocketFactory& factory)
+uint16_t SocketAcceptor::listen(const std::vector<std::string>& interfaces, const std::string& port, int backlog,
+                                const SocketFactory& factory)
 {
     std::vector<std::string> addresses = expandInterfaces(interfaces);
     if (addresses.empty()) {
         // We specified some interfaces, but couldn't find addresses for them
         QPID_LOG(warning, "TCP/TCP6: No specified network interfaces found: Not Listening");
-        listeningPort = 0;
-        return;
+        return 0;
     }
 
+    int listeningPort = 0;
     for (unsigned i = 0; i<addresses.size(); ++i) {
         QPID_LOG(debug, "Using interface: " << addresses[i]);
         SocketAddress sa(addresses[i], port);
@@ -148,15 +148,10 @@ void ServerListener::listen(const std::vector<std::string>& interfaces, const st
             listeners.push_back(s);
         }
     }
-    return;
-}
-
-uint16_t ServerListener::getPort() const
-{
     return listeningPort;
 }
 
-void ServerListener::accept(boost::shared_ptr<Poller> poller, ConnectionCodec::Factory* f)
+void SocketAcceptor::accept(boost::shared_ptr<Poller> poller, ConnectionCodec::Factory* f)
 {
     for (unsigned i = 0; i<listeners.size(); ++i) {
         acceptors.push_back(
@@ -166,12 +161,17 @@ void ServerListener::accept(boost::shared_ptr<Poller> poller, ConnectionCodec::F
     }
 }
 
-void ServerListener::connect(
+SocketConnector::SocketConnector(bool tcpNoDelay, bool nodict, uint32_t maxNegotiateTime, Timer& timer0) :
+    timer(timer0),
+    options(tcpNoDelay, nodict, maxNegotiateTime)
+{}
+
+void SocketConnector::connect(
     boost::shared_ptr<Poller> poller,
     const std::string& name,
     const std::string& host, const std::string& port,
     ConnectionCodec::Factory* fact,
-    ProtocolFactory::ConnectFailedCallback failed,
+    TransportConnectorFactory::ConnectFailedCallback failed,
     const SocketFactory& factory)
 {
     // Note that the following logic does not cause a memory leak.

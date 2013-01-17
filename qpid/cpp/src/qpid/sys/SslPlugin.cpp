@@ -59,20 +59,39 @@ struct SslServerOptions : ssl::SslOptions
     }
 };
 
-class SslProtocolFactory : public ProtocolFactory {
-    ServerListener socketListener;
+class SslAcceptor : public TransportAcceptor {
+    SocketAcceptor socketListener;
 
-  public:
-    SslProtocolFactory(const qpid::broker::Broker::Options& opts, const SslServerOptions& options,
-                       Timer& timer);
+public:
+    SslAcceptor(const qpid::broker::Broker::Options& opts, bool nodict, Timer& timer);
+    uint16_t listen(const std::vector<std::string>& interfaces, const std::string& port, int backlog, const SocketFactory& factory);
     void accept(boost::shared_ptr<Poller>, ConnectionCodec::Factory*);
+};
+
+class SslConnector : public TransportConnectorFactory {
+    SocketConnector socketConnector;
+    
+public:
+    SslConnector(const qpid::broker::Broker::Options& opts, bool nodict, Timer& timer);
     void connect(boost::shared_ptr<Poller>, const std::string& name, const std::string& host, const std::string& port,
                  ConnectionCodec::Factory*,
                  ConnectFailedCallback);
-
-    uint16_t getPort() const;
 };
 
+namespace {
+    Socket* createServerSSLSocket(const SslServerOptions& options) {
+        return new SslSocket(options.certName, options.clientAuth);
+    }
+    
+    Socket* createServerSSLMuxSocket(const SslServerOptions& options) {
+        return new SslMuxSocket(options.certName, options.clientAuth);
+    }
+    
+    Socket* createClientSSLSocket() {
+        return new SslSocket();
+    }
+    
+}
 
 // Static instance to initialise plugin
 static struct SslPlugin : public Plugin {
@@ -115,18 +134,24 @@ static struct SslPlugin : public Plugin {
                     nssInitialized = true;
 
                     const broker::Broker::Options& opts = broker->getOptions();
-
-                    ProtocolFactory::shared_ptr protocol(
-                        new SslProtocolFactory(opts, options, broker->getTimer()));
-
-                    if (protocol->getPort()!=0 ) {
+                    TransportAcceptor::shared_ptr ta;
+                    SslAcceptor* sa =
+                        new SslAcceptor(opts, options.nodict, broker->getTimer());
+                    uint16_t port = sa->listen(opts.listenInterfaces, boost::lexical_cast<std::string>(options.port), opts.connectionBacklog,
+                                               options.multiplex ?
+                                                boost::bind(&createServerSSLMuxSocket, options) :
+                                                boost::bind(&createServerSSLSocket, options)
+                    );
+                    if ( port!=0 ) {
+                        ta.reset(sa);
                         QPID_LOG(notice, "Listening for " <<
                                         (options.multiplex ? "SSL or TCP" : "SSL") <<
                                         " connections on TCP/TCP6 port " <<
-                                        protocol->getPort());
+                                        port);
                     }
 
-                    broker->registerProtocolFactory("ssl", protocol);
+                    TransportConnectorFactory::shared_ptr tc(new SslConnector(opts, options.nodict, broker->getTimer()));
+                    broker->registerTransport("ssl", ta, tc, port);
                 } catch (const std::exception& e) {
                     QPID_LOG(error, "Failed to initialise SSL plugin: " << e.what());
                 }
@@ -135,44 +160,34 @@ static struct SslPlugin : public Plugin {
     }
 } sslPlugin;
 
-namespace {
-    Socket* createServerSSLSocket(const SslServerOptions& options) {
-        return options.multiplex ?
-            new SslMuxSocket(options.certName, options.clientAuth) :
-            new SslSocket(options.certName, options.clientAuth);
-    }
-
-    Socket* createClientSSLSocket() {
-        return new SslSocket();
-    }
-
-}
-
-SslProtocolFactory::SslProtocolFactory(const qpid::broker::Broker::Options& opts, const SslServerOptions& options,
-                                       Timer& timer) :
-    socketListener(opts.tcpNoDelay, options.nodict, opts.maxNegotiateTime, timer)
+SslAcceptor::SslAcceptor(const qpid::broker::Broker::Options& opts, bool nodict, Timer& timer) :
+    socketListener(opts.tcpNoDelay, nodict, opts.maxNegotiateTime, timer)
 {
-    socketListener.listen(opts.listenInterfaces, boost::lexical_cast<std::string>(options.port), opts.connectionBacklog,
-            boost::bind(&createServerSSLSocket, options));
 }
 
-uint16_t SslProtocolFactory::getPort() const {
-    return socketListener.getPort();
+uint16_t SslAcceptor::listen(const std::vector< std::string >& interfaces, const std::string& port, int backlog, const SocketFactory& factory)
+{
+    return socketListener.listen(interfaces, port, backlog, factory);
 }
 
-void SslProtocolFactory::accept(boost::shared_ptr<Poller> poller,
+void SslAcceptor::accept(boost::shared_ptr<Poller> poller,
                                 ConnectionCodec::Factory* fact) {
     socketListener.accept(poller, fact);
 }
 
-void SslProtocolFactory::connect(
+SslConnector::SslConnector(const qpid::broker::Broker::Options& opts, bool nodict, Timer& timer) :
+    socketConnector(opts.tcpNoDelay, nodict, opts.maxNegotiateTime, timer)
+{
+}
+
+void SslConnector::connect(
     boost::shared_ptr<Poller> poller,
     const std::string& name,
     const std::string& host, const std::string& port,
     ConnectionCodec::Factory* fact,
     ConnectFailedCallback failed)
 {
-    socketListener.connect(poller, name, host, port, fact, failed, &createClientSSLSocket);
+    socketConnector.connect(poller, name, host, port, fact, failed, &createClientSSLSocket);
 }
 
 }} // namespace qpid::sys

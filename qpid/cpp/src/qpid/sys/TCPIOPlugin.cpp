@@ -35,19 +35,24 @@ namespace sys {
 
 class Timer;
 
-class AsynchIOProtocolFactory : public ProtocolFactory {
-    ServerListener socketListener;
-    uint16_t listeningPort;
+class AsynchIOAcceptor : public TransportAcceptor {
+    SocketAcceptor socketListener;
 
   public:
-    AsynchIOProtocolFactory(const qpid::broker::Broker::Options& opts, Timer& timer, bool shouldListen);
+    AsynchIOAcceptor(const qpid::broker::Broker::Options& opts, Timer& timer);
+    uint16_t listen(const std::vector<std::string>& interfaces, const std::string& port, int backlog);
     void accept(boost::shared_ptr<Poller>, ConnectionCodec::Factory*);
+};
+
+class AsynchIOConnector : public TransportConnectorFactory {
+    SocketConnector socketConnector;
+    
+public:
+    AsynchIOConnector(const qpid::broker::Broker::Options& opts, Timer& timer);
     void connect(boost::shared_ptr<Poller>, const std::string& name,
                  const std::string& host, const std::string& port,
                  ConnectionCodec::Factory*,
                  ConnectFailedCallback);
-
-    uint16_t getPort() const;
 };
 
 static bool sslMultiplexEnabled(void)
@@ -78,49 +83,52 @@ static class TCPIOPlugin : public Plugin {
             // Check for SSL on the same port
             bool shouldListen = !sslMultiplexEnabled();
 
-            ProtocolFactory::shared_ptr protocolt(
-                new AsynchIOProtocolFactory(opts, broker->getTimer(), shouldListen));
-
-            if (shouldListen && protocolt->getPort()!=0 ) {
-                QPID_LOG(notice, "Listening on TCP/TCP6 port " << protocolt->getPort());
+            uint16_t port = opts.port;
+            TransportAcceptor::shared_ptr ta;
+            if (shouldListen) {
+                AsynchIOAcceptor* aa = new AsynchIOAcceptor(opts, broker->getTimer());
+                ta.reset(aa);
+                port = aa->listen(opts.listenInterfaces, boost::lexical_cast<std::string>(opts.port), opts.connectionBacklog);
+                if ( port!=0 ) {
+                    QPID_LOG(notice, "Listening on TCP/TCP6 port " << port);
+                }
             }
 
-            broker->registerProtocolFactory("tcp", protocolt);
+            TransportConnectorFactory::shared_ptr tc(new AsynchIOConnector(opts, broker->getTimer()));
+            
+            broker->registerTransport("tcp", ta, tc, port);
         }
     }
 } tcpPlugin;
 
-AsynchIOProtocolFactory::AsynchIOProtocolFactory(const qpid::broker::Broker::Options& opts, Timer& timer, bool shouldListen) :
+AsynchIOAcceptor::AsynchIOAcceptor(const qpid::broker::Broker::Options& opts, Timer& timer) :
     socketListener(opts.tcpNoDelay, false, opts.maxNegotiateTime, timer)
 {
-    if (!shouldListen) {
-        listeningPort = boost::lexical_cast<uint16_t>(opts.port);
-        return;
-    }
-
-    socketListener.listen(opts.listenInterfaces, boost::lexical_cast<std::string>(opts.port), opts.connectionBacklog, 
-                &createSocket);
-
-    listeningPort = socketListener.getPort();
 }
 
-uint16_t AsynchIOProtocolFactory::getPort() const {
-    return listeningPort; // Immutable no need for lock.
+uint16_t AsynchIOAcceptor::listen(const std::vector< std::string >& interfaces, const std::string& port, int backlog)
+{
+    return socketListener.listen(interfaces, port, backlog, &createSocket);
 }
 
-void AsynchIOProtocolFactory::accept(boost::shared_ptr<Poller> poller,
+void AsynchIOAcceptor::accept(boost::shared_ptr<Poller> poller,
                                      ConnectionCodec::Factory* fact) {
     socketListener.accept(poller, fact);
 }
                                      
-void AsynchIOProtocolFactory::connect(
+AsynchIOConnector::AsynchIOConnector(const qpid::broker::Broker::Options& opts, Timer& timer) :
+    socketConnector(opts.tcpNoDelay, false, opts.maxNegotiateTime, timer)
+{
+}
+
+void AsynchIOConnector::connect(
     boost::shared_ptr<Poller> poller,
     const std::string& name,
     const std::string& host, const std::string& port,
     ConnectionCodec::Factory* fact,
     ConnectFailedCallback failed)
 {
-    socketListener.connect(poller, name, host, port, fact, failed, &createSocket);
+    socketConnector.connect(poller, name, host, port, fact, failed, &createSocket);
 }
 
 }} // namespace qpid::sys

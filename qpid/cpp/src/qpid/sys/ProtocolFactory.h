@@ -35,14 +35,21 @@ class AsynchAcceptor;
 class Poller;
 class Timer;
 
-class ProtocolFactory : public qpid::SharedObject<ProtocolFactory>
+class TransportAcceptor : public qpid::SharedObject<TransportAcceptor>
 {
   public:
-    typedef boost::function2<void, int, std::string> ConnectFailedCallback;
-
-    virtual ~ProtocolFactory() = 0;
-    virtual uint16_t getPort() const = 0;
+    virtual ~TransportAcceptor() = 0;
     virtual void accept(boost::shared_ptr<Poller>, ConnectionCodec::Factory*) = 0;
+};
+
+inline TransportAcceptor::~TransportAcceptor() {}
+
+class TransportConnectorFactory : public qpid::SharedObject<TransportConnectorFactory>
+{
+public:
+    typedef boost::function2<void, int, std::string> ConnectFailedCallback;
+    
+    virtual ~TransportConnectorFactory() = 0;
     virtual void connect(
         boost::shared_ptr<Poller>,
         const std::string& name,
@@ -51,50 +58,56 @@ class ProtocolFactory : public qpid::SharedObject<ProtocolFactory>
         ConnectFailedCallback failed) = 0;
 };
 
-inline ProtocolFactory::~ProtocolFactory() {}
+inline TransportConnectorFactory::~TransportConnectorFactory() {}
 
 class Socket;
 typedef boost::function0<Socket*> SocketFactory;
 
-struct ServerListenerOptions {
+struct SocketTransportOptions {
     bool tcpNoDelay;
     bool nodict;
     uint32_t maxNegotiateTime;
 
-    ServerListenerOptions(bool t, bool d, uint32_t m) :
+    SocketTransportOptions(bool t, bool d, uint32_t m) :
         tcpNoDelay(t),
         nodict(d),
         maxNegotiateTime(m)
     {}
 };
 
-class ServerListener {
+class SocketAcceptor {
+    boost::ptr_vector<Socket> listeners;
+    boost::ptr_vector<AsynchAcceptor> acceptors;
+    Timer& timer;
+    SocketTransportOptions options;
+
+public:
+    SocketAcceptor(bool tcpNoDelay, bool nodict, uint32_t maxNegotiateTime, Timer& timer);
+
+    uint16_t listen(const std::vector<std::string>& interfaces, const std::string& port, int backlog,
+                    const SocketFactory& factory);
+
+    void accept(boost::shared_ptr<Poller> poller, ConnectionCodec::Factory* f);
+};
+
+class SocketConnector {
     boost::ptr_vector<Socket> listeners;
     boost::ptr_vector<AsynchAcceptor> acceptors;
     Timer& timer;
     uint16_t listeningPort;
-    ServerListenerOptions options;
-
+    SocketTransportOptions options;
+    
 public:
-    ServerListener(bool tcpNoDelay, bool nodict, uint32_t maxNegotiateTime, Timer& timer);
-
-    uint16_t getPort() const;
-
-    void listen(const std::vector<std::string>& interfaces, const std::string& port, int backlog,
-                const SocketFactory& factory);
-
-    void accept(boost::shared_ptr<Poller> poller, ConnectionCodec::Factory* f);
-
+    SocketConnector(bool tcpNoDelay, bool nodict, uint32_t maxNegotiateTime, Timer& timer);
+    
     void connect(boost::shared_ptr<Poller> poller,
                  const std::string& name,
                  const std::string& host, const std::string& port,
                  ConnectionCodec::Factory* f,
-                 ProtocolFactory::ConnectFailedCallback failed,
+                 TransportConnectorFactory::ConnectFailedCallback failed,
                  const SocketFactory& factory);
 };
 
 }}
 
-
-    
 #endif  //!_sys_ProtocolFactory_h
