@@ -37,6 +37,7 @@ class Poller;
 class Timer;
 class Socket;
 typedef boost::function0<Socket*> SocketFactory;
+typedef boost::function3<void, boost::shared_ptr<Poller>, const Socket&, ConnectionCodec::Factory*> EstablishedCallback;
 
 struct SocketTransportOptions {
     bool tcpNoDelay;
@@ -56,9 +57,12 @@ class SocketAcceptor : public TransportAcceptor {
     Timer& timer;
     const SocketFactory factory;
     SocketTransportOptions options;
+    const EstablishedCallback established;
 
 public:
     SocketAcceptor(bool tcpNoDelay, bool nodict, uint32_t maxNegotiateTime, Timer& timer, const SocketFactory& factory);
+    SocketAcceptor(bool tcpNoDelay, bool nodict, uint32_t maxNegotiateTime, Timer& timer,
+                   const SocketFactory& factory, const EstablishedCallback& established);
 
     uint16_t listen(const std::vector<std::string>& interfaces, const std::string& port, int backlog);
 

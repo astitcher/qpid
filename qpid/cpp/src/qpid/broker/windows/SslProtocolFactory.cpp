@@ -19,7 +19,8 @@
  *
  */
 
-#include "qpid/sys/ProtocolFactory.h"
+#include "qpid/sys/TransportFactory.h"
+#include "qpid/sys/SocketTransport.h"
 
 #include "qpid/Plugin.h"
 #include "qpid/broker/Broker.h"
@@ -79,12 +80,9 @@ struct SslServerOptions : qpid::Options
     }
 };
 
-class SslProtocolFactory : public qpid::sys::ProtocolFactory {
-    boost::ptr_vector<Socket> listeners;
-    boost::ptr_vector<AsynchAcceptor> acceptors;
+class SslProtocolFactory : public qpid::sys::SocketAcceptor, public qpid::sys::TransportConnector {
     Timer& brokerTimer;
     uint32_t maxNegotiateTime;
-    uint16_t listeningPort;
     const bool tcpNoDelay;
     std::string brokerHost;
     const bool clientAuthSelected;
@@ -95,12 +93,10 @@ class SslProtocolFactory : public qpid::sys::ProtocolFactory {
   public:
     SslProtocolFactory(const qpid::broker::Broker::Options& opts, const SslServerOptions&, Timer& timer);
     ~SslProtocolFactory();
-    void accept(sys::Poller::shared_ptr, sys::ConnectionCodec::Factory*);
+
     void connect(sys::Poller::shared_ptr, const std::string& name, const std::string& host, const std::string& port,
                  sys::ConnectionCodec::Factory*,
                  ConnectFailedCallback failed);
-
-    uint16_t getPort() const;
 
   private:
     void connectFailed(const qpid::sys::Socket&,
@@ -126,9 +122,11 @@ static struct SslPlugin : public Plugin {
         if (broker) {
             try {
                 const broker::Broker::Options& opts = broker->getOptions();
-                ProtocolFactory::shared_ptr protocol(new SslProtocolFactory(opts, options, broker->getTimer()));
-                QPID_LOG(notice, "Listening for SSL connections on TCP port " << protocol->getPort());
-                broker->registerProtocolFactory("ssl", protocol);
+                boost::shared_ptr<SslProtocolFactory> protocol(new SslProtocolFactory(opts, options, broker->getTimer()));
+                uint16_t port = protocol->listen(opts.listenInterfaces, boost::lexical_cast<std::string>(opts.port), opts.connectionBacklog);
+
+                QPID_LOG(notice, "Listening for SSL connections on TCP port " << port);
+                broker->registerTransport("ssl", protocol, protocol, port);
             } catch (const std::exception& e) {
                 QPID_LOG(error, "Failed to initialise SSL listener: " << e.what());
             }
@@ -137,7 +135,9 @@ static struct SslPlugin : public Plugin {
 } sslPlugin;
 
 SslProtocolFactory::SslProtocolFactory(const qpid::broker::Broker::Options& opts, const SslServerOptions& options, Timer& timer)
-    : brokerTimer(timer),
+    : SocketAcceptor(opts.tcpNoDelay, false, opts.maxNegotiateTime, timer,
+                     &createSocket, boost::bind(&SslProtocolFactory::establishedIncoming, this, _1, _2, _3)),
+      brokerTimer(timer),
       maxNegotiateTime(opts.maxNegotiateTime),
       tcpNoDelay(opts.tcpNoDelay),
       clientAuthSelected(options.clientAuth) {
@@ -202,10 +202,6 @@ SslProtocolFactory::SslProtocolFactory(const qpid::broker::Broker::Options& opts
         throw QPID_WINDOWS_ERROR(status);
     ::CertFreeCertificateContext(certContext);
     ::CertCloseStore(certStoreHandle, 0);
-
-    listeningPort =
-        listenTo(opts.listenInterfaces, boost::lexical_cast<std::string>(opts.port), opts.connectionBacklog, 
-                 &createSocket, listeners);
 }
 
 SslProtocolFactory::~SslProtocolFactory() {
@@ -274,20 +270,6 @@ void SslProtocolFactory::establishedCommon(sys::Poller::shared_ptr poller,
     aio->start(poller);
 }
 
-uint16_t SslProtocolFactory::getPort() const {
-    return listeningPort; // Immutable no need for lock.
-}
-
-void SslProtocolFactory::accept(sys::Poller::shared_ptr poller,
-                                sys::ConnectionCodec::Factory* fact) {
-    for (unsigned i = 0; i<listeners.size(); ++i) {
-        acceptors.push_back(
-            AsynchAcceptor::create(listeners[i],
-                            boost::bind(&SslProtocolFactory::establishedIncoming, this, poller, _1, fact)));
-        acceptors[i].start(poller);
-    }
-}
-
 void SslProtocolFactory::connect(sys::Poller::shared_ptr poller,
                                  const std::string& name,
                                  const std::string& host,
@@ -327,4 +309,4 @@ void SslProtocolFactory::connect(sys::Poller::shared_ptr poller,
                                         this, _1, _2, _3));
 }
 
-
+}}}
