@@ -56,10 +56,90 @@
  *                Identifier "IS "NOT" "NULL"
  */
 
+#include <string>
+#include <boost/scoped_ptr.hpp>
+
 namespace qpid {
 namespace broker {
 
+class Expression;
+
 using std::string;
+
+class ConditionalExpression {
+public:
+    virtual bool eval() = 0;
+};
+
+class BinCondOperator {
+public:
+    virtual bool eval(Expression&, Expression&) = 0;
+};
+
+class UnCondOperator {
+public:
+    virtual bool eval(Expression&) = 0;
+};
+
+class BinaryConditionalExpression {
+    boost::scoped_ptr<BinCondOperator> op;
+    boost::scoped_ptr<Expression> e1;
+    boost::scoped_ptr<Expression> e2;
+
+public:
+    virtual bool eval() {
+        return op->eval(*e1, *e2);
+    }
+};
+
+class UnaryConditionalExpression {
+    boost::scoped_ptr<UnCondOperator> op;
+    boost::scoped_ptr<Expression> e1;
+
+public:
+    virtual bool eval() {
+        return op->eval(*e1);
+    }
+};
+
+class Expression {
+public:
+    virtual std::string eval() = 0;
+};
+
+// Some conditional operators...
+
+// "="
+class Eq : public BinCondOperator {
+    bool eval(Expression& e1, Expression& e2) {
+        return e1.eval() == e2.eval();
+    }
+};
+
+// "<>"
+class Neq : public BinCondOperator {
+    bool eval(Expression& e1, Expression& e2) {
+        return e1.eval() != e2.eval();
+    }
+};
+
+// "IS NULL"
+class Null : public UnCondOperator {
+    bool eval(Expression& e) {
+        return e.eval().empty(); // TODO: This is wrong test!!
+    }
+};
+
+// "IS NOT NULL"
+class NonNull : public UnCondOperator {
+    bool eval(Expression& e) {
+        return !e.eval().empty(); // TODO: This is wrong test!!
+    }
+};
+
+// Some expression types...
+
+////////////////////////////////////////////////////
 
 class SelectorParseState {
     const std::string& expression;
