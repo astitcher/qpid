@@ -23,6 +23,8 @@
 
 #include "qpid/broker/Message.h"
 
+#include <cctype>
+
 #include <boost/make_shared.hpp>
 
 /*
@@ -40,7 +42,8 @@
  * // Currently no numerics at all
  * //Sign ::= "-" | "+"
  * //LiteralExactNumeric ::= [Sign] Digit+
- * //LiteralApproxNumeric ::= ( [Sign] Digit+ "." Digit* [ "E" LiteralExactNumeric ] ) |
+ * //LiteralApproxNumeric ::= ( [Sign] Digit "." Digit* [ "E" LiteralExactNumeric ] ) |
+ * //                         ( [Sign] "." Digit+ [ "E" LiteralExactNumeric ] ) |
  * //                         ( [Sign] Digit+ "E" LiteralExactNumeric )
  * //LiteralBool ::= "TRUE" | "FALSE"
  * //
@@ -66,78 +69,137 @@ class Expression;
 
 using std::string;
 
-class ConditionalExpression {
+class BooleanExpression {
 public:
-    virtual bool eval() = 0;
+    virtual bool eval(const SelectorEnv&) const = 0;
+    
+    static boost::scoped_ptr<BooleanExpression> parse(std::string::const_iterator& s, std::string::const_iterator& e);
 };
 
-class BinCondOperator {
+class EqualityOperator {
 public:
-    virtual bool eval(Expression&, Expression&) = 0;
+    virtual bool eval(Expression&, Expression&, const SelectorEnv&) const = 0;
 };
 
-class UnCondOperator {
+class UnaryBooleanOperator {
 public:
-    virtual bool eval(Expression&) = 0;
+    virtual bool eval(Expression&, const SelectorEnv&) const = 0;
 };
 
-class BinaryConditionalExpression {
-    boost::scoped_ptr<BinCondOperator> op;
+class EqualityExpression : public BooleanExpression {
+    friend class BooleanExpression;
+
+    boost::scoped_ptr<EqualityOperator> op;
     boost::scoped_ptr<Expression> e1;
     boost::scoped_ptr<Expression> e2;
 
 public:
-    virtual bool eval() {
-        return op->eval(*e1, *e2);
+    virtual bool eval(const SelectorEnv& env) const {
+        return op->eval(*e1, *e2, env);
     }
 };
 
-class UnaryConditionalExpression {
-    boost::scoped_ptr<UnCondOperator> op;
+class UnaryBooleanExpression : public BooleanExpression {
+    friend class BooleanExpression;
+    
+    boost::scoped_ptr<UnaryBooleanOperator> op;
     boost::scoped_ptr<Expression> e1;
 
 public:
-    virtual bool eval() {
-        return op->eval(*e1);
+    virtual bool eval(const SelectorEnv& env) const {
+        return op->eval(*e1, env);
     }
 };
 
 class Expression {
 public:
-    virtual std::string eval() = 0;
+    virtual std::string eval(const SelectorEnv&) const = 0;
+
+    static boost::scoped_ptr<Expression> parse(std::string::const_iterator& s, std::string::const_iterator& e);
 };
 
 // Some conditional operators...
 
 // "="
-class Eq : public BinCondOperator {
-    bool eval(Expression& e1, Expression& e2) {
-        return e1.eval() == e2.eval();
+class Eq : public EqualityOperator {
+    bool eval(Expression& e1, Expression& e2, const SelectorEnv& env) const {
+        return e1.eval(env) == e2.eval(env);
     }
 };
 
 // "<>"
-class Neq : public BinCondOperator {
-    bool eval(Expression& e1, Expression& e2) {
-        return e1.eval() != e2.eval();
+class Neq : public EqualityOperator {
+    bool eval(Expression& e1, Expression& e2, const SelectorEnv& env) const {
+        return e1.eval(env) != e2.eval(env);
     }
 };
 
 // "IS NULL"
-class Null : public UnCondOperator {
-    bool eval(Expression& e) {
-        return e.eval().empty(); // TODO: This is wrong test!!
+class IsNull : public UnaryBooleanOperator {
+    bool eval(Expression& e, const SelectorEnv& env) const {
+        return e.eval(env).empty(); // TODO: This is wrong test!!
     }
 };
 
 // "IS NOT NULL"
-class NonNull : public UnCondOperator {
-    bool eval(Expression& e) {
-        return !e.eval().empty(); // TODO: This is wrong test!!
+class IsNonNull : public UnaryBooleanOperator {
+    bool eval(Expression& e, const SelectorEnv& env) const {
+        return !e.eval(env).empty(); // TODO: This is wrong test!!
     }
 };
 
+Eq eq;
+Neq neq;
+IsNull isNull;
+IsNonNull isNonNull;
+
 // Some expression types...
+
+class Literal : public Expression {
+    friend class Expression;
+
+    std::string value;
+
+public:
+    std::string eval(const SelectorEnv&) const {
+        return value;
+    }
+    
+};
+
+class Identifier : public Expression {
+    friend class Expression;
+    
+    std::string identifier;
+
+public:
+    std::string eval(const SelectorEnv& env) const {
+        return env.value(identifier);
+    }
+};
+
+// Parsers always take string const_iterators to mark the beginning and end of the string being parsed
+// if the parse is successful then the start iterator is advanced, if the parse fails then the start
+// iterator is unchanged.
+
+// Elemental parsers
+
+// Parse regular fixed token like "=", "<>" etc.
+bool parseRegularToken(const std::string& tok, std::string::const_iterator& s, std::string::const_iterator& /*e*/)
+{
+    std::string::const_iterator initial = s;
+    size_t l = tok.size();
+    std::string str(s, s+l);
+    
+    if ( str == tok) {
+        s += l;
+        return true;
+    }
+    return false;
+}
+
+// Parse reserved word like "IS", "NULL" etc. (case insensitive, terminated by ws or non alphanumeric)
+bool parseReservedWord(const std::string& tok, std::string::const_iterator& s, std::string::const_iterator& /*e*/);
 
 ////////////////////////////////////////////////////
 
