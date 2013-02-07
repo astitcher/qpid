@@ -23,8 +23,6 @@
 
 #include "qpid/broker/Message.h"
 
-#include <cctype>
-
 #include <boost/make_shared.hpp>
 
 /*
@@ -181,25 +179,6 @@ public:
 // Parsers always take string const_iterators to mark the beginning and end of the string being parsed
 // if the parse is successful then the start iterator is advanced, if the parse fails then the start
 // iterator is unchanged.
-
-// Elemental parsers
-
-// Parse regular fixed token like "=", "<>" etc.
-bool parseRegularToken(const std::string& tok, std::string::const_iterator& s, std::string::const_iterator& /*e*/)
-{
-    std::string::const_iterator initial = s;
-    size_t l = tok.size();
-    std::string str(s, s+l);
-    
-    if ( str == tok) {
-        s += l;
-        return true;
-    }
-    return false;
-}
-
-// Parse reserved word like "IS", "NULL" etc. (case insensitive, terminated by ws or non alphanumeric)
-bool parseReservedWord(const std::string& tok, std::string::const_iterator& s, std::string::const_iterator& /*e*/);
 
 ////////////////////////////////////////////////////
 

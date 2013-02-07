@@ -1207,6 +1207,8 @@ set (qpidbroker_SOURCES
      qpid/broker/SecureConnectionFactory.cpp
      qpid/broker/Selector.h
      qpid/broker/Selector.cpp
+     qpid/broker/SelectorToken.h
+     qpid/broker/SelectorToken.cpp
      qpid/broker/SemanticState.h
      qpid/broker/SemanticState.cpp
      qpid/broker/SessionAdapter.cpp
