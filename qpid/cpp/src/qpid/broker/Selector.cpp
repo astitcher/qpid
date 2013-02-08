@@ -70,7 +70,7 @@ using std::string;
 class BooleanExpression {
 public:
     virtual bool eval(const SelectorEnv&) const = 0;
-    
+
     static boost::scoped_ptr<BooleanExpression> parse(std::string::const_iterator& s, std::string::const_iterator& e);
 };
 
@@ -99,7 +99,7 @@ public:
 
 class UnaryBooleanExpression : public BooleanExpression {
     friend class BooleanExpression;
-    
+
     boost::scoped_ptr<UnaryBooleanOperator> op;
     boost::scoped_ptr<Expression> e1;
 
@@ -162,12 +162,11 @@ public:
     std::string eval(const SelectorEnv&) const {
         return value;
     }
-    
 };
 
 class Identifier : public Expression {
     friend class Expression;
-    
+
     std::string identifier;
 
 public:

@@ -55,6 +55,8 @@ struct Token {
 
 bool tokeniseIdentifier(std::string::const_iterator& s, std::string::const_iterator& e, Token& tok);
 
+bool tokeniseReservedWord(std::string::const_iterator& s, std::string::const_iterator& e, Token& tok);
+
 bool tokeniseIdentifierOrReservedWord(std::string::const_iterator& s, std::string::const_iterator& e, Token& tok);
 
 bool tokeniseString(std::string::const_iterator& s, std::string::const_iterator& e, Token& tok);

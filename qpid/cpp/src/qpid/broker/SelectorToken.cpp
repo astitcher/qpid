@@ -51,11 +51,11 @@ bool tokeniseIdentifier(std::string::const_iterator& s, std::string::const_itera
 {
     // Be sure that first char is alphanumeric or _ or $
     if ( s==e || !isIdentifierStart(*s) ) return false;
-    
+
     std::string::const_iterator t = s;
-    
+
     while ( s!=e && isIdentifierPart(*++s) );
-    
+
     tok.type = T_IDENTIFIER;
     tok.val = std::string(t, s);
 
@@ -74,11 +74,16 @@ struct RWEntry {
 
 bool caseless(const char* s1, const char* s2)
 {
-    while ( *s1 && *s2 ) {
-        if (std::tolower(*s1++)>=std::tolower(*s2++))
+    do {
+        char ls1 = std::tolower(*s1);
+        char ls2 = std::tolower(*s2);
+        if (ls1<ls2)
+            return true;
+        else if (ls1>ls2)
             return false;
-    }
-    return true;
+    } while ( *s1++ && *s2++ );
+    // Equal
+    return false;
 }
 
 bool operator<(const RWEntry& r, const char* rhs) {
@@ -106,42 +111,49 @@ bool tokeniseReservedWord(Token& tok)
         {"or", T_OR},
         {"true", T_TRUE}
     };
-    
+
     const int reserved_size = sizeof(reserved)/sizeof(RWEntry);
-        
+
     if ( tok.type != T_IDENTIFIER ) return false;
-    
+
     std::pair<const RWEntry*, const RWEntry*> entry = std::equal_range(&reserved[0], &reserved[reserved_size], tok.val.c_str());
 
     if ( entry.first==entry.second ) return false;
-    
+
     tok.type = entry.first->type;
     return true;
 }
 
-bool tokeniseIdentifierOrReservedWord(std::string::const_iterator& s, std::string::const_iterator& e, Token& tok)
+bool tokeniseReservedWord(std::string::const_iterator& s, std::string::const_iterator& e, Token& tok)
 {
     return tokeniseIdentifier(s, e, tok) && tokeniseReservedWord(tok);
+}
+
+bool tokeniseIdentifierOrReservedWord(std::string::const_iterator& s, std::string::const_iterator& e, Token& tok)
+{
+    bool r = tokeniseIdentifier(s, e, tok);
+    (void) tokeniseReservedWord(tok);
+    return r;
 }
 
 // parsing strings is complicated by the need to allow "''" as an embedded single quote
 bool tokeniseString(std::string::const_iterator& s, std::string::const_iterator& e, Token& tok)
 {
     if ( s==e || *s != '\'' ) return false;
-    
+
     std::string::const_iterator q = std::find(s+1, e, '\'');
     if ( q==e ) return false;
-    
+
     std::string content(s+1, q);
     s = q; ++s;
-    
+
     while ( s!=e && *s=='\'' ) {
         std::string::const_iterator q = std::find(s+1, e, '\'');
         if ( q==e ) return false;
         content += std::string(s, q);
         s = q; s++;
     }
-    
+
     tok.type = T_STRING;
     tok.val = content;
     return true;
@@ -173,13 +185,13 @@ inline bool isOperatorPart(char c)
 bool tokeniseOperator(std::string::const_iterator& s, std::string::const_iterator& e, Token& tok)
 {
     if ( s==e || !isOperatorPart(*s) ) return false;
-    
+
     std::string::const_iterator t = s;
-    
+
     while (s!=e && isOperatorPart(*++s));
-    
+
     tok.type = T_OPERATOR;
     tok.val = std::string(t, s);
-    
-    return true;   
+
+    return true;
 }

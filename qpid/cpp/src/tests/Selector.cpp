@@ -32,14 +32,53 @@ namespace tests {
 
 QPID_AUTO_TEST_SUITE(SelectorSuite)
 
-QPID_AUTO_TEST_CASE(tokenise)
-{
-    Token t;
-    string s("123");
+typedef bool (*Tokeniser)(string::const_iterator&,string::const_iterator&,Token&);
+
+void verifyTokeniserSuccess(Tokeniser t, const char* ss, TokenType tt, const char* tv, const char* fs) {
+    Token tok;
+    string s(ss);
     string::const_iterator sb = s.begin();
     string::const_iterator se = s.end();
-    BOOST_CHECK(!tokeniseIdentifier(sb, se, t));
-    //BOOST_CHECK_EQUAL();
+    BOOST_CHECK(t(sb, se, tok));
+    BOOST_CHECK_EQUAL(tok.type, tt);
+    BOOST_CHECK_EQUAL(tok.val, tv);
+    BOOST_CHECK_EQUAL(string(sb, se), fs);
+}
+
+void verifyTokeniserFail(Tokeniser t, const char* c) {
+    Token tok;
+    string s(c);
+    string::const_iterator sb = s.begin();
+    string::const_iterator se = s.end();
+    BOOST_CHECK(!t(sb, se, tok));
+    BOOST_CHECK_EQUAL(string(sb, se), c);
+}
+
+void verifyTokeniserFailNoPositionCheck(Tokeniser t, const char* c) {
+    Token tok;
+    string s(c);
+    string::const_iterator sb = s.begin();
+    string::const_iterator se = s.end();
+    BOOST_CHECK(!t(sb, se, tok));
+}
+
+QPID_AUTO_TEST_CASE(tokeniseSuccess)
+{
+    verifyTokeniserSuccess(&tokeniseIdentifier, "_123+blah", T_IDENTIFIER, "_123", "+blah");
+    verifyTokeniserSuccess(&tokeniseIdentifier, "null_123+blah", T_IDENTIFIER, "null_123", "+blah");
+    verifyTokeniserSuccess(&tokeniseIdentifierOrReservedWord, "null_123+blah", T_IDENTIFIER, "null_123", "+blah");
+    verifyTokeniserSuccess(&tokeniseIdentifierOrReservedWord, "null+blah", T_NULL, "null", "+blah");
+    verifyTokeniserSuccess(&tokeniseIdentifierOrReservedWord, "null+blah", T_NULL, "null", "+blah");
+    verifyTokeniserSuccess(&tokeniseIdentifierOrReservedWord, "Is nOt null", T_IS, "Is", " nOt null");
+}
+
+QPID_AUTO_TEST_CASE(tokeniseFailure)
+{
+    verifyTokeniserFail(&tokeniseIdentifier, "123");
+    verifyTokeniserFail(&tokeniseIdentifier, "'Embedded 123'");
+    verifyTokeniserFailNoPositionCheck(&tokeniseReservedWord, "1.2e5");
+    verifyTokeniserFailNoPositionCheck(&tokeniseReservedWord, "'Stringy thing'");
+    verifyTokeniserFailNoPositionCheck(&tokeniseReservedWord, "oR_andsomething");
 }
 
 QPID_AUTO_TEST_SUITE_END()
