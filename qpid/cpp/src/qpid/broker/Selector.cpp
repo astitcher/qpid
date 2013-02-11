@@ -22,6 +22,7 @@
 #include "qpid/broker/Selector.h"
 
 #include "qpid/broker/Message.h"
+#include "qpid/broker/SelectorToken.h"
 
 #include <boost/make_shared.hpp>
 
@@ -38,11 +39,10 @@
  * LiteralString ::= ("'" ~[']* "'")+ // Repeats to cope with embedded single quote
  *
  * // Currently no numerics at all
- * //Sign ::= "-" | "+"
- * //LiteralExactNumeric ::= [Sign] Digit+
- * //LiteralApproxNumeric ::= ( [Sign] Digit "." Digit* [ "E" LiteralExactNumeric ] ) |
- * //                         ( [Sign] "." Digit+ [ "E" LiteralExactNumeric ] ) |
- * //                         ( [Sign] Digit+ "E" LiteralExactNumeric )
+ * //LiteralExactNumeric ::= Digit+
+ * //LiteralApproxNumeric ::= ( Digit "." Digit* [ "E" LiteralExactNumeric ] ) |
+ * //                         ( "." Digit+ [ "E" LiteralExactNumeric ] ) |
+ * //                         ( Digit+ "E" LiteralExactNumeric )
  * //LiteralBool ::= "TRUE" | "FALSE"
  * //
  *
@@ -52,9 +52,9 @@
  * //OpsLogical ::= "AND" | "OR"
  * OpsComparison ::= "=" | "<>" // | ">" | ">=" | "<" | "<="
  *
- * Comparison ::= (Identifier | Literal) OpsComparison (Identifier | Literal) |
- *                Identifier "IS" "NULL" |
- *                Identifier "IS "NOT" "NULL"
+ * BoolExpression ::= (Identifier | Literal) OpsComparison (Identifier | Literal) |
+ *                    Identifier "IS" "NULL" |
+ *                    Identifier "IS "NOT" "NULL"
  */
 
 #include <string>
@@ -67,11 +67,12 @@ class Expression;
 
 using std::string;
 
-class BooleanExpression {
+class BoolExpression {
 public:
     virtual bool eval(const SelectorEnv&) const = 0;
 
-    static boost::scoped_ptr<BooleanExpression> parse(std::string::const_iterator& s, std::string::const_iterator& e);
+    static BoolExpression* parse(string::const_iterator& s, string::const_iterator& e);
+    static BoolExpression* parse(const string& exp);
 };
 
 class EqualityOperator {
@@ -79,31 +80,43 @@ public:
     virtual bool eval(Expression&, Expression&, const SelectorEnv&) const = 0;
 };
 
+template <typename T>
 class UnaryBooleanOperator {
 public:
-    virtual bool eval(Expression&, const SelectorEnv&) const = 0;
+    virtual bool eval(T&, const SelectorEnv&) const = 0;
 };
 
-class EqualityExpression : public BooleanExpression {
-    friend class BooleanExpression;
+class EqualityExpression : public BoolExpression {
+    friend class BoolExpression;
 
-    boost::scoped_ptr<EqualityOperator> op;
+    EqualityOperator* op;
     boost::scoped_ptr<Expression> e1;
     boost::scoped_ptr<Expression> e2;
 
 public:
+    EqualityExpression(EqualityOperator* o, Expression* e, Expression* e_):
+        op(o),
+        e1(e),
+        e2(e_)
+    {}
+
     virtual bool eval(const SelectorEnv& env) const {
         return op->eval(*e1, *e2, env);
     }
 };
 
-class UnaryBooleanExpression : public BooleanExpression {
-    friend class BooleanExpression;
+template <typename T>
+class UnaryBooleanExpression : public BoolExpression {
+    friend class BoolExpression;
 
-    boost::scoped_ptr<UnaryBooleanOperator> op;
-    boost::scoped_ptr<Expression> e1;
+    UnaryBooleanOperator<T>* op;
+    boost::scoped_ptr<T> e1;
 
 public:
+    UnaryBooleanExpression(UnaryBooleanOperator<T>* o, T* e) :
+        op(o),
+        e1(e)
+    {}
     virtual bool eval(const SelectorEnv& env) const {
         return op->eval(*e1, env);
     }
@@ -111,9 +124,9 @@ public:
 
 class Expression {
 public:
-    virtual std::string eval(const SelectorEnv&) const = 0;
+    virtual string eval(const SelectorEnv&) const = 0;
 
-    static boost::scoped_ptr<Expression> parse(std::string::const_iterator& s, std::string::const_iterator& e);
+    static Expression* parse(string::const_iterator& s, string::const_iterator& e);
 };
 
 // Some conditional operators...
@@ -132,17 +145,55 @@ class Neq : public EqualityOperator {
     }
 };
 
+// Some expression types...
+
+class Literal : public Expression {
+    friend class Expression;
+
+    string value;
+
+public:
+    Literal(const string& v) :
+        value(v)
+    {}
+
+    string eval(const SelectorEnv&) const {
+        return value;
+    }
+};
+
+class Identifier : public Expression {
+    friend class Expression;
+
+    string identifier;
+
+public:
+    Identifier(const string& i) :
+        identifier(i)
+    {}
+    
+    string eval(const SelectorEnv& env) const {
+        return env.value(identifier);
+    }
+    
+    bool present(const SelectorEnv& env) const {
+        return env.present(identifier);
+    }
+};
+
+////////////////////////////////////////////////////
+
 // "IS NULL"
-class IsNull : public UnaryBooleanOperator {
-    bool eval(Expression& e, const SelectorEnv& env) const {
-        return e.eval(env).empty(); // TODO: This is wrong test!!
+class IsNull : public UnaryBooleanOperator<Identifier> {
+    bool eval(Identifier& i, const SelectorEnv& env) const {
+        return i.present(env);
     }
 };
 
 // "IS NOT NULL"
-class IsNonNull : public UnaryBooleanOperator {
-    bool eval(Expression& e, const SelectorEnv& env) const {
-        return !e.eval(env).empty(); // TODO: This is wrong test!!
+class IsNonNull : public UnaryBooleanOperator<Identifier> {
+    bool eval(Identifier& i, const SelectorEnv& env) const {
+        return !i.present(env);
     }
 };
 
@@ -151,48 +202,85 @@ Neq neq;
 IsNull isNull;
 IsNonNull isNonNull;
 
-// Some expression types...
-
-class Literal : public Expression {
-    friend class Expression;
-
-    std::string value;
-
-public:
-    std::string eval(const SelectorEnv&) const {
-        return value;
-    }
-};
-
-class Identifier : public Expression {
-    friend class Expression;
-
-    std::string identifier;
-
-public:
-    std::string eval(const SelectorEnv& env) const {
-        return env.value(identifier);
-    }
-};
+////////////////////////////////////////////////////
 
 // Parsers always take string const_iterators to mark the beginning and end of the string being parsed
 // if the parse is successful then the start iterator is advanced, if the parse fails then the start
 // iterator is unchanged.
 
+// Top level parser
+BoolExpression* BoolExpression::parse(const string& exp)
+{
+    string::const_iterator s = exp.begin();
+    string::const_iterator e = exp.end();
+    BoolExpression* b = parse(s, e);
+    if (nextToken(s, e).type != T_EOS) throw std::range_error("Illegal selector: too much input");
+    return b;
+}
+
+BoolExpression* BoolExpression::parse(string::const_iterator& s, string::const_iterator& e)
+{
+    Token t;
+    t = nextToken(s, e);
+
+    Token op;
+    op = nextToken(s,e);
+
+    Expression* e1 = 0;
+    switch (t.type) {
+    case T_IDENTIFIER: {
+        Identifier* i = new Identifier(t.val);
+        
+        // Check for "IS NULL" and "IS NOT NULL"
+        if ( op.type==T_IS ) {
+            // The rest must be T_NULL or T_NOT, T_NULL
+            t = nextToken(s, e);
+            switch (t.type) {
+            case T_NULL:
+                return new UnaryBooleanExpression<Identifier>(&isNull, i);
+            case T_NOT:
+                if ( nextToken(s, e).type == T_NULL)
+                    return new UnaryBooleanExpression<Identifier>(&isNonNull, i);
+            default:
+                throw std::range_error("Illegal selector: illegal IS syntax");
+                break;
+            }
+        }
+        e1 = i;
+        break;
+    }
+    case T_STRING:
+        e1 = new Literal(t.val);
+        break;
+    default:
+        throw std::range_error("Illegal selector: unexpected expression1");
+    }
+    
+    if (op.type != T_OPERATOR)
+        throw std::range_error("Illegal selector: unexpected operator");
+    
+    t = nextToken(s, e);
+    Expression* e2 = 0;
+    switch (t.type) {
+    case T_IDENTIFIER:
+        e1 = new Identifier(t.val);
+        break;
+    case T_STRING:
+        e1 = new Literal(t.val);
+        break;
+    default:
+        throw std::range_error("Illegal selector: unexpected expression2");
+    }
+    if (op.val == "=") return new EqualityExpression(&eq, e1, e2);
+    if (op.val == "<>") return new EqualityExpression(&neq, e1, e2);
+
+    throw std::range_error("Illegal selector: unknown operator");
+}
+
 ////////////////////////////////////////////////////
 
-class SelectorParseState {
-    const std::string& expression;
-
-public:
-    SelectorParseState(const std::string& e) :
-        expression(e)
-    {
-    }
-};
-
 Selector::Selector(const string& e) :
-    parseState(new SelectorParseState(e)),
+    parse(BoolExpression::parse(e)),
     expression(e)
 {
 }

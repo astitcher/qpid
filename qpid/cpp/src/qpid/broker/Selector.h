@@ -31,7 +31,7 @@ namespace qpid {
 namespace broker {
 
 class Message;
-class SelectorParseState;
+class BoolExpression;
 
 /**
  * Interface to provide values to a Selector evaluation
@@ -57,7 +57,7 @@ public:
 };
 
 class Selector {
-    boost::scoped_ptr<SelectorParseState> parseState;
+    boost::scoped_ptr<BoolExpression> parse;
     const std::string expression;
 
 public:
