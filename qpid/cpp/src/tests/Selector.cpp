@@ -24,8 +24,23 @@
 #include "unit_test.h"
 
 #include <string>
+#include <iosfwd>
 
 using std::string;
+
+namespace qb = qpid::broker;
+
+using qpid::broker::Token;
+using qpid::broker::TokenType;
+using qpid::broker::tokeniseEos;
+using qpid::broker::tokeniseIdentifier;
+using qpid::broker::tokeniseIdentifierOrReservedWord;
+using qpid::broker::tokeniseReservedWord;
+using qpid::broker::tokeniseOperator;
+using qpid::broker::tokeniseParens;
+using qpid::broker::tokeniseNumeric;
+using qpid::broker::tokeniseString;
+using qpid::broker::nextToken;
 
 namespace qpid {
 namespace tests {
@@ -40,8 +55,7 @@ void verifyTokeniserSuccess(Tokeniser t, const char* ss, TokenType tt, const cha
     string::const_iterator sb = s.begin();
     string::const_iterator se = s.end();
     BOOST_CHECK(t(sb, se, tok));
-    BOOST_CHECK_EQUAL(tok.type, tt);
-    BOOST_CHECK_EQUAL(tok.val, tv);
+    BOOST_CHECK_EQUAL(tok, Token(tt, tv));
     BOOST_CHECK_EQUAL(string(sb, se), fs);
 }
 
@@ -64,21 +78,73 @@ void verifyTokeniserFailNoPositionCheck(Tokeniser t, const char* c) {
 
 QPID_AUTO_TEST_CASE(tokeniseSuccess)
 {
-    verifyTokeniserSuccess(&tokeniseIdentifier, "_123+blah", T_IDENTIFIER, "_123", "+blah");
-    verifyTokeniserSuccess(&tokeniseIdentifier, "null_123+blah", T_IDENTIFIER, "null_123", "+blah");
-    verifyTokeniserSuccess(&tokeniseIdentifierOrReservedWord, "null_123+blah", T_IDENTIFIER, "null_123", "+blah");
-    verifyTokeniserSuccess(&tokeniseIdentifierOrReservedWord, "null+blah", T_NULL, "null", "+blah");
-    verifyTokeniserSuccess(&tokeniseIdentifierOrReservedWord, "null+blah", T_NULL, "null", "+blah");
-    verifyTokeniserSuccess(&tokeniseIdentifierOrReservedWord, "Is nOt null", T_IS, "Is", " nOt null");
+    verifyTokeniserSuccess(&tokeniseEos, "", qb::T_EOS, "", "");
+    verifyTokeniserSuccess(&tokeniseIdentifier, "null_123+blah", qb::T_IDENTIFIER, "null_123", "+blah");
+    verifyTokeniserSuccess(&tokeniseIdentifierOrReservedWord, "null_123+blah", qb::T_IDENTIFIER, "null_123", "+blah");
+    verifyTokeniserSuccess(&tokeniseIdentifierOrReservedWord, "null+blah", qb::T_NULL, "null", "+blah");
+    verifyTokeniserSuccess(&tokeniseIdentifierOrReservedWord, "null+blah", qb::T_NULL, "null", "+blah");
+    verifyTokeniserSuccess(&tokeniseIdentifierOrReservedWord, "Is nOt null", qb::T_IS, "Is", " nOt null");
+    verifyTokeniserSuccess(&tokeniseIdentifierOrReservedWord, "nOt null", qb::T_NOT, "nOt", " null");
+    verifyTokeniserSuccess(&tokeniseIdentifierOrReservedWord, "Is nOt null", qb::T_IS, "Is", " nOt null");
+    verifyTokeniserSuccess(&tokeniseString, "'Hello World'", qb::T_STRING, "Hello World", "");
+    verifyTokeniserSuccess(&tokeniseString, "'Hello World''s end'a bit more", qb::T_STRING, "Hello World's end", "a bit more");
+    verifyTokeniserSuccess(&tokeniseOperator, "=blah", qb::T_OPERATOR, "=", "blah");
+    verifyTokeniserSuccess(&tokeniseOperator, "<> Identifier", qb::T_OPERATOR, "<>", " Identifier");
+    verifyTokeniserSuccess(&tokeniseParens, "(a and b) not c", qb::T_LPAREN, "(", "a and b) not c");
+    verifyTokeniserSuccess(&tokeniseParens, ") not c", qb::T_RPAREN, ")", " not c");
 }
 
 QPID_AUTO_TEST_CASE(tokeniseFailure)
 {
+    verifyTokeniserFail(&tokeniseEos, "hb23");
     verifyTokeniserFail(&tokeniseIdentifier, "123");
     verifyTokeniserFail(&tokeniseIdentifier, "'Embedded 123'");
-    verifyTokeniserFailNoPositionCheck(&tokeniseReservedWord, "1.2e5");
-    verifyTokeniserFailNoPositionCheck(&tokeniseReservedWord, "'Stringy thing'");
-    verifyTokeniserFailNoPositionCheck(&tokeniseReservedWord, "oR_andsomething");
+    verifyTokeniserFail(&tokeniseReservedWord, "1.2e5");
+    verifyTokeniserFail(&tokeniseReservedWord, "'Stringy thing'");
+    verifyTokeniserFail(&tokeniseReservedWord, "oR_andsomething");
+    verifyTokeniserFail(&tokeniseString, "'Embedded 123");
+    verifyTokeniserFail(&tokeniseString, "'This isn''t fair");
+    verifyTokeniserFail(&tokeniseOperator, "123");
+    verifyTokeniserFail(&tokeniseOperator, "'Stringy thing'");
+    verifyTokeniserFail(&tokeniseOperator, "NoT");
+    verifyTokeniserFail(&tokeniseOperator, "(a and b)");
+    verifyTokeniserFail(&tokeniseOperator, ")");
+    verifyTokeniserFail(&tokeniseParens, "=");
+    verifyTokeniserFail(&tokeniseParens, "what ho!");
+}
+
+QPID_AUTO_TEST_CASE(tokenString)
+{
+    string exp("  a =b");
+    string::const_iterator s = exp.begin();
+    string::const_iterator e = exp.end();
+    Token t;
+
+    t = nextToken(s,e);
+    BOOST_CHECK_EQUAL(t, Token(qb::T_IDENTIFIER, "a"));
+    t = nextToken(s,e);
+    BOOST_CHECK_EQUAL(t, Token(qb::T_OPERATOR, "="));
+    t = nextToken(s,e);
+    BOOST_CHECK_EQUAL(t, Token(qb::T_IDENTIFIER, "b"));
+    t = nextToken(s,e);
+    BOOST_CHECK_EQUAL(t, Token(qb::T_EOS, ""));
+
+    exp = " not 'hello kitty''s friend' = Is null       ";
+    s = exp.begin();
+    e = exp.end();
+
+    t = nextToken(s,e);
+    BOOST_CHECK_EQUAL(t, Token(qb::T_NOT, "not"));
+    t = nextToken(s,e);
+    BOOST_CHECK_EQUAL(t, Token(qb::T_STRING, "hello kitty's friend"));
+    t = nextToken(s,e);
+    BOOST_CHECK_EQUAL(t, Token(qb::T_OPERATOR, "="));
+    t = nextToken(s,e);
+    BOOST_CHECK_EQUAL(t, Token(qb::T_IS, "Is"));
+    t = nextToken(s,e);
+    BOOST_CHECK_EQUAL(t, Token(qb::T_NULL, "null"));
+    t = nextToken(s,e);
+    BOOST_CHECK_EQUAL(t, Token(qb::T_EOS, ""));
 }
 
 QPID_AUTO_TEST_SUITE_END()

@@ -22,11 +22,15 @@
  *
  */
 
+#include <iosfwd>
 #include <string>
+#include <stdexcept>
 
-//#include <boost/function.hpp>
+namespace qpid {
+namespace broker {
 
 typedef enum {
+    T_EOS,
     T_NULL,
     T_TRUE,
     T_FALSE,
@@ -41,17 +45,42 @@ typedef enum {
     T_STRING,
     T_NUMERIC_EXACT,
     T_NUMERIC_APPROX,
-    T_LBRACE,
-    T_RBRACE,
+    T_LPAREN,
+    T_RPAREN,
     T_OPERATOR
 } TokenType;
 
 struct Token {
     TokenType type;
     std::string val;
+
+    Token()
+    {}
+
+    Token(TokenType t, const std::string& v) :
+        type(t),
+        val(v)
+    {}
+
+    Token(TokenType t, const std::string::const_iterator& s, const std::string::const_iterator& e) :
+    type(t),
+    val(std::string(s,e))
+    {}
+
+    bool operator==(const Token& r) const
+    {
+        return type == r.type && val == r.val;
+    }
 };
 
-// typedef boost::function3<bool,std::string::const_iterator&,std::string::const_iterator&,Token&> Tokeniser;
+std::ostream& operator<<(std::ostream& os, const Token& t);
+
+class TokenException : public std::range_error {
+public:
+    TokenException(const std::string&);
+};
+
+bool tokeniseEos(std::string::const_iterator& s, std::string::const_iterator& e, Token& tok);
 
 bool tokeniseIdentifier(std::string::const_iterator& s, std::string::const_iterator& e, Token& tok);
 
@@ -61,10 +90,14 @@ bool tokeniseIdentifierOrReservedWord(std::string::const_iterator& s, std::strin
 
 bool tokeniseString(std::string::const_iterator& s, std::string::const_iterator& e, Token& tok);
 
-bool tokeniseBraces(std::string::const_iterator& s, std::string::const_iterator& e, Token& tok);
+bool tokeniseParens(std::string::const_iterator& s, std::string::const_iterator& e, Token& tok);
 
 bool tokeniseOperator(std::string::const_iterator& s, std::string::const_iterator& e, Token& tok);
 
 bool tokeniseNumeric(std::string::const_iterator& s, std::string::const_iterator& e, Token& tok);
+
+Token nextToken(std::string::const_iterator& s, std::string::const_iterator& e);
+
+}}
 
 #endif

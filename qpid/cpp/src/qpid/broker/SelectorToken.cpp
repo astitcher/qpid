@@ -23,10 +23,24 @@
 
 #include <string>
 #include <algorithm>
+#include <iostream>
+
+namespace qpid {
+namespace broker {
 
 // Tokeniserss always take string const_iterators to mark the beginning and end of the string being tokenised
 // if the tokenise is successful then the start iterator is advanced, if the tokenise fails then the start
 // iterator is unchanged.
+
+std::ostream& operator<<(std::ostream& os, const Token& t)
+{
+    os << "T<" << t.type << ", " << t.val << ">";
+    return os;
+}
+
+TokenException::TokenException(const std::string& msg) :
+    range_error(msg)
+{}
 
 // Not much of a parser...
 void skipWS(std::string::const_iterator& s, std::string::const_iterator& e)
@@ -34,6 +48,14 @@ void skipWS(std::string::const_iterator& s, std::string::const_iterator& e)
     while ( s!=e && std::isspace(*s) ) {
         ++s;
     }
+}
+
+bool tokeniseEos(std::string::const_iterator& s, std::string::const_iterator& e, Token& tok)
+{
+    if ( s!=e ) return false;
+
+    tok = Token(T_EOS, "");
+    return true;
 }
 
 inline bool isIdentifierStart(char c)
@@ -46,7 +68,6 @@ inline bool isIdentifierPart(char c)
     return std::isalnum(c) || c=='_' || c=='$';
 }
 
-// Parse reserved word like "IS", "NULL" etc. (case insensitive, terminated by ws or non alphanumeric)
 bool tokeniseIdentifier(std::string::const_iterator& s, std::string::const_iterator& e, Token& tok)
 {
     // Be sure that first char is alphanumeric or _ or $
@@ -56,8 +77,7 @@ bool tokeniseIdentifier(std::string::const_iterator& s, std::string::const_itera
 
     while ( s!=e && isIdentifierPart(*++s) );
 
-    tok.type = T_IDENTIFIER;
-    tok.val = std::string(t, s);
+    tok = Token(T_IDENTIFIER, t, s);
 
     return true;
 }
@@ -124,15 +144,19 @@ bool tokeniseReservedWord(Token& tok)
     return true;
 }
 
+// This is really only used for testing
 bool tokeniseReservedWord(std::string::const_iterator& s, std::string::const_iterator& e, Token& tok)
 {
-    return tokeniseIdentifier(s, e, tok) && tokeniseReservedWord(tok);
+    std::string::const_iterator p = s;
+    bool r = tokeniseIdentifier(p, e, tok) && tokeniseReservedWord(tok);
+    if (r) s = p;
+    return r;
 }
 
 bool tokeniseIdentifierOrReservedWord(std::string::const_iterator& s, std::string::const_iterator& e, Token& tok)
 {
     bool r = tokeniseIdentifier(s, e, tok);
-    (void) tokeniseReservedWord(tok);
+    if (r) (void) tokeniseReservedWord(tok);
     return r;
 }
 
@@ -145,31 +169,32 @@ bool tokeniseString(std::string::const_iterator& s, std::string::const_iterator&
     if ( q==e ) return false;
 
     std::string content(s+1, q);
-    s = q; ++s;
+    ++q;
 
-    while ( s!=e && *s=='\'' ) {
-        std::string::const_iterator q = std::find(s+1, e, '\'');
+    while ( q!=e && *q=='\'' ) {
+        std::string::const_iterator p = q;
+        q = std::find(p+1, e, '\'');
         if ( q==e ) return false;
-        content += std::string(s, q);
-        s = q; s++;
+        content += std::string(p, q);
+        ++q;
     }
 
-    tok.type = T_STRING;
-    tok.val = content;
+    s = q;
+    tok = Token(T_STRING, content);
     return true;
 }
 
-bool tokeniseBraces(std::string::const_iterator& s, std::string::const_iterator& e, Token& tok)
+bool tokeniseParens(std::string::const_iterator& s, std::string::const_iterator& e, Token& tok)
 {
     if ( s==e) return false;
     if ( *s=='(' ) {
-        tok.type = T_LBRACE;
-        tok.val = *s++;
+        tok = Token (T_LPAREN, s, s+1);
+        ++s;
         return true;
     }
     if ( *s==')' ) {
-        tok.type = T_RBRACE;
-        tok.val = *s++;
+        tok = Token (T_RPAREN, s, s+1);
+        ++s;
         return true;
     }
     return false;
@@ -177,7 +202,7 @@ bool tokeniseBraces(std::string::const_iterator& s, std::string::const_iterator&
 
 inline bool isOperatorPart(char c)
 {
-    return !std::isalnum(c) && !std::isspace(c) && c!='_' && c!='$' && c!='(' && c!=')';
+    return !std::isalnum(c) && !std::isspace(c) && c!='_' && c!='$' && c!='(' && c!=')' && c!= '\'';
 }
 
 // These lexical tokens contain no alphanumerics - this is broader than actual operators but
@@ -190,8 +215,37 @@ bool tokeniseOperator(std::string::const_iterator& s, std::string::const_iterato
 
     while (s!=e && isOperatorPart(*++s));
 
-    tok.type = T_OPERATOR;
-    tok.val = std::string(t, s);
-
+    tok = Token(T_OPERATOR, t, s);
     return true;
 }
+
+// Can't parse numerics yet
+bool tokeniseNumeric(std::string::const_iterator& /*s*/, std::string::const_iterator& /*e*/, Token& /*tok*/)
+{
+    return false;
+}
+
+/**
+ * Skip any whitespace then look for a token, throwing an exception if no valid token
+ * is found.
+ *
+ * Advance the string iterator past the parsed token on success. On failure the string iterator is 
+ * in an undefined location.
+ */
+Token nextToken(std::string::const_iterator& s, std::string::const_iterator& e)
+{
+    skipWS(s, e);
+
+    Token tok;
+
+    if (tokeniseEos(s, e, tok)) return tok;
+    if (tokeniseIdentifierOrReservedWord(s, e, tok)) return tok;
+    if (tokeniseNumeric(s, e, tok)) return tok;
+    if (tokeniseString(s, e, tok)) return tok;
+    if (tokeniseParens(s, e, tok)) return tok;
+    if (tokeniseOperator(s, e, tok)) return tok;
+
+    throw TokenException("Found illegal character");
+}
+
+}}
