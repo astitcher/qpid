@@ -171,11 +171,11 @@ public:
     Identifier(const string& i) :
         identifier(i)
     {}
-    
+
     string eval(const SelectorEnv& env) const {
         return env.value(identifier);
     }
-    
+
     bool present(const SelectorEnv& env) const {
         return env.present(identifier);
     }
@@ -186,14 +186,14 @@ public:
 // "IS NULL"
 class IsNull : public UnaryBooleanOperator<Identifier> {
     bool eval(Identifier& i, const SelectorEnv& env) const {
-        return i.present(env);
+        return !i.present(env);
     }
 };
 
 // "IS NOT NULL"
 class IsNonNull : public UnaryBooleanOperator<Identifier> {
     bool eval(Identifier& i, const SelectorEnv& env) const {
-        return !i.present(env);
+        return i.present(env);
     }
 };
 
@@ -263,10 +263,10 @@ BoolExpression* BoolExpression::parse(string::const_iterator& s, string::const_i
     Expression* e2 = 0;
     switch (t.type) {
     case T_IDENTIFIER:
-        e1 = new Identifier(t.val);
+        e2 = new Identifier(t.val);
         break;
     case T_STRING:
-        e1 = new Literal(t.val);
+        e2 = new Literal(t.val);
         break;
     default:
         throw std::range_error("Illegal selector: unexpected expression2");
@@ -291,8 +291,7 @@ Selector::~Selector()
 
 bool Selector::eval(const SelectorEnv& env)
 {
-    // Simple test - return true if expression is a non-empty property
-    return env.present(expression);
+    return parse->eval(env);
 }
 
 bool Selector::filter(const Message& msg)

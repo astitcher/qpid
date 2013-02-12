@@ -20,13 +20,16 @@
  */
 
 #include "qpid/broker/SelectorToken.h"
+#include "qpid/broker/Selector.h"
 
 #include "unit_test.h"
 
 #include <string>
 #include <iosfwd>
+#include <map>
 
 using std::string;
+using std::map;
 
 namespace qb = qpid::broker;
 
@@ -145,6 +148,55 @@ QPID_AUTO_TEST_CASE(tokenString)
     BOOST_CHECK_EQUAL(t, Token(qb::T_NULL, "null"));
     t = nextToken(s,e);
     BOOST_CHECK_EQUAL(t, Token(qb::T_EOS, ""));
+}
+
+class TestSelectorEnv : public qpid::broker::SelectorEnv {
+    map<string, string> values;
+
+    bool present(const std::string& v) const {
+        return values.find(v)!=values.end();
+    }
+
+    std::string value(const std::string& v) const {
+        return present(v) ? values.at(v) : "";
+    }
+
+public:
+    void set(const string& id, const string& value) {
+        values[id] = value;
+    }
+};
+
+QPID_AUTO_TEST_CASE(parseString)
+{
+    BOOST_CHECK_THROW(qb::Selector e("'Daft' is not null"), std::range_error);
+    BOOST_CHECK_THROW(qb::Selector e("A is null not"), std::range_error);
+    BOOST_CHECK_THROW(qb::Selector e("in='hello kitty'"), std::range_error);
+    qb::Selector a("A is not null");
+    qb::Selector a1("A is null");
+    qb::Selector a2("A = C");
+    qb::Selector a3("A <> C");
+    qb::Selector c("C is not null");
+    qb::Selector c1("C is null");
+    qb::Selector d("A='hello kitty'");
+    qb::Selector e("A<>'hello kitty'");
+    qb::Selector f("A=B");
+    qb::Selector g("A<>B");
+
+    TestSelectorEnv env;
+    env.set("A", "Bye, bye cruel world");
+    env.set("B", "hello kitty");
+
+    BOOST_CHECK(a.eval(env));
+    BOOST_CHECK(!a1.eval(env));
+    BOOST_CHECK(!a2.eval(env));
+    BOOST_CHECK(a3.eval(env));
+    BOOST_CHECK(!c.eval(env));
+    BOOST_CHECK(c1.eval(env));
+    BOOST_CHECK(!d.eval(env));
+    BOOST_CHECK(e.eval(env));
+    BOOST_CHECK(!f.eval(env));
+    BOOST_CHECK(g.eval(env));
 }
 
 QPID_AUTO_TEST_SUITE_END()
