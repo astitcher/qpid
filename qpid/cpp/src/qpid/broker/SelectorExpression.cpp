@@ -25,6 +25,7 @@
 #include "qpid/broker/SelectorToken.h"
 
 #include <string>
+#include <memory>
 #include <boost/scoped_ptr.hpp>
 
 /*
@@ -126,6 +127,7 @@ public:
 
 class Expression {
 public:
+    virtual ~Expression() {}
     virtual string eval(const SelectorEnv&) const = 0;
 
     static Expression* parse(string::const_iterator& s, string::const_iterator& e);
@@ -150,8 +152,6 @@ class Neq : public EqualityOperator {
 // Some expression types...
 
 class Literal : public Expression {
-    friend class Expression;
-
     string value;
 
 public:
@@ -165,8 +165,6 @@ public:
 };
 
 class Identifier : public Expression {
-    friend class Expression;
-
     string identifier;
 
 public:
@@ -216,10 +214,10 @@ BoolExpression* parseTopBoolExpression(const string& exp)
     string::const_iterator s = exp.begin();
     string::const_iterator e = exp.end();
     Tokeniser tokeniser(s,e);
-    BoolExpression* b = parseEqualityExpression(tokeniser);
-    if (!b) throw std::range_error("Illegal selector: couldn't parse");
+    std::auto_ptr<BoolExpression> b(parseEqualityExpression(tokeniser));
+    if (!b.get()) throw std::range_error("Illegal selector: couldn't parse");
     if (tokeniser.nextToken().type != T_EOS) throw std::range_error("Illegal selector: too much input");
-    return b;
+    return b.release();
 }
 
 BoolExpression* parseEqualityExpression(Tokeniser& tokeniser)
@@ -230,7 +228,7 @@ BoolExpression* parseEqualityExpression(Tokeniser& tokeniser)
     Token op;
     op = tokeniser.nextToken();
 
-    Expression* e1 = 0;
+    std::auto_ptr<Expression> e1;
     switch (t.type) {
     case T_IDENTIFIER: {
         string val = t.val;
@@ -249,38 +247,35 @@ BoolExpression* parseEqualityExpression(Tokeniser& tokeniser)
                 break;
             }
         }
-        e1 = new Identifier(val);
+        e1.reset(new Identifier(val));
         break;
     }
     case T_STRING:
-        e1 = new Literal(t.val);
+        e1.reset(new Literal(t.val));
         break;
     default:
         return 0;
     }
 
     if (op.type != T_OPERATOR) {
-        delete e1;
         return 0;
     }
 
     t = tokeniser.nextToken();
-    Expression* e2 = 0;
+    std::auto_ptr<Expression> e2;
     switch (t.type) {
     case T_IDENTIFIER:
-        e2 = new Identifier(t.val);
+        e2.reset(new Identifier(t.val));
         break;
     case T_STRING:
-        e2 = new Literal(t.val);
+        e2.reset(new Literal(t.val));
         break;
     default:
         return 0;
     }
-    if (op.val == "=") return new EqualityExpression(&eq, e1, e2);
-    if (op.val == "<>") return new EqualityExpression(&neq, e1, e2);
+    if (op.val == "=") return new EqualityExpression(&eq, e1.release(), e2.release());
+    if (op.val == "<>") return new EqualityExpression(&neq, e1.release(), e2.release());
 
-    delete e2;
-    delete e1;
     return 0;
 }
 

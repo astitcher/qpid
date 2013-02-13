@@ -32,8 +32,8 @@ class Tokeniser;
 
 class BoolExpression {
 public:
+    virtual ~BoolExpression() {};
     virtual bool eval(const SelectorEnv&) const = 0;
-
 };
 
 BoolExpression* parseTopBoolExpression(const std::string& exp);
