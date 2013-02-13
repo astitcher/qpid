@@ -25,6 +25,7 @@
 #include <iosfwd>
 #include <string>
 #include <stdexcept>
+#include <vector>
 
 namespace qpid {
 namespace broker {
@@ -96,7 +97,18 @@ bool tokeniseOperator(std::string::const_iterator& s, std::string::const_iterato
 
 bool tokeniseNumeric(std::string::const_iterator& s, std::string::const_iterator& e, Token& tok);
 
-Token nextToken(std::string::const_iterator& s, std::string::const_iterator& e);
+class Tokeniser {
+    std::vector<Token> tokens;
+    unsigned int tokp;
+
+    std::string::const_iterator inp;
+    std::string::const_iterator inEnd;
+
+public:
+    Tokeniser(const std::string::const_iterator& s, const std::string::const_iterator& e);
+    void returnTokens(unsigned int n);
+    Token nextToken();
+};
 
 }}
 

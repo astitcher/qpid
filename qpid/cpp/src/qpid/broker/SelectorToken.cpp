@@ -24,6 +24,7 @@
 #include <string>
 #include <algorithm>
 #include <iostream>
+#include <cassert>
 
 namespace qpid {
 namespace broker {
@@ -225,6 +226,13 @@ bool tokeniseNumeric(std::string::const_iterator& /*s*/, std::string::const_iter
     return false;
 }
 
+Tokeniser::Tokeniser(const std::string::const_iterator& s, const std::string::const_iterator& e) :
+    tokp(0),
+    inp(s),
+    inEnd(e)
+{
+}
+
 /**
  * Skip any whitespace then look for a token, throwing an exception if no valid token
  * is found.
@@ -232,20 +240,30 @@ bool tokeniseNumeric(std::string::const_iterator& /*s*/, std::string::const_iter
  * Advance the string iterator past the parsed token on success. On failure the string iterator is 
  * in an undefined location.
  */
-Token nextToken(std::string::const_iterator& s, std::string::const_iterator& e)
+Token Tokeniser::nextToken()
 {
-    skipWS(s, e);
+    if ( tokens.size()>tokp ) return tokens[tokp++];
 
-    Token tok;
+    skipWS(inp, inEnd);
 
-    if (tokeniseEos(s, e, tok)) return tok;
-    if (tokeniseIdentifierOrReservedWord(s, e, tok)) return tok;
-    if (tokeniseNumeric(s, e, tok)) return tok;
-    if (tokeniseString(s, e, tok)) return tok;
-    if (tokeniseParens(s, e, tok)) return tok;
-    if (tokeniseOperator(s, e, tok)) return tok;
+    tokens.push_back(Token());
+    Token& tok = tokens[tokp++];
+
+    if (tokeniseEos(inp, inEnd, tok)) return tok;
+    if (tokeniseIdentifierOrReservedWord(inp, inEnd, tok)) return tok;
+    if (tokeniseNumeric(inp, inEnd, tok)) return tok;
+    if (tokeniseString(inp, inEnd, tok)) return tok;
+    if (tokeniseParens(inp, inEnd, tok)) return tok;
+    if (tokeniseOperator(inp, inEnd, tok)) return tok;
 
     throw TokenException("Found illegal character");
 }
+
+void Tokeniser::returnTokens(unsigned int n)
+{
+    assert( n>=tokp );
+    tokp-=n;
+}
+
 
 }}

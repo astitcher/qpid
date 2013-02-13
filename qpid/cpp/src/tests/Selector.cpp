@@ -35,6 +35,7 @@ namespace qb = qpid::broker;
 
 using qpid::broker::Token;
 using qpid::broker::TokenType;
+using qpid::broker::Tokeniser;
 using qpid::broker::tokeniseEos;
 using qpid::broker::tokeniseIdentifier;
 using qpid::broker::tokeniseIdentifierOrReservedWord;
@@ -43,16 +44,15 @@ using qpid::broker::tokeniseOperator;
 using qpid::broker::tokeniseParens;
 using qpid::broker::tokeniseNumeric;
 using qpid::broker::tokeniseString;
-using qpid::broker::nextToken;
 
 namespace qpid {
 namespace tests {
 
 QPID_AUTO_TEST_SUITE(SelectorSuite)
 
-typedef bool (*Tokeniser)(string::const_iterator&,string::const_iterator&,Token&);
+typedef bool (*TokeniseF)(string::const_iterator&,string::const_iterator&,Token&);
 
-void verifyTokeniserSuccess(Tokeniser t, const char* ss, TokenType tt, const char* tv, const char* fs) {
+void verifyTokeniserSuccess(TokeniseF t, const char* ss, TokenType tt, const char* tv, const char* fs) {
     Token tok;
     string s(ss);
     string::const_iterator sb = s.begin();
@@ -62,21 +62,13 @@ void verifyTokeniserSuccess(Tokeniser t, const char* ss, TokenType tt, const cha
     BOOST_CHECK_EQUAL(string(sb, se), fs);
 }
 
-void verifyTokeniserFail(Tokeniser t, const char* c) {
+void verifyTokeniserFail(TokeniseF t, const char* c) {
     Token tok;
     string s(c);
     string::const_iterator sb = s.begin();
     string::const_iterator se = s.end();
     BOOST_CHECK(!t(sb, se, tok));
     BOOST_CHECK_EQUAL(string(sb, se), c);
-}
-
-void verifyTokeniserFailNoPositionCheck(Tokeniser t, const char* c) {
-    Token tok;
-    string s(c);
-    string::const_iterator sb = s.begin();
-    string::const_iterator se = s.end();
-    BOOST_CHECK(!t(sb, se, tok));
 }
 
 QPID_AUTO_TEST_CASE(tokeniseSuccess)
@@ -118,36 +110,28 @@ QPID_AUTO_TEST_CASE(tokeniseFailure)
 
 QPID_AUTO_TEST_CASE(tokenString)
 {
+
     string exp("  a =b");
     string::const_iterator s = exp.begin();
     string::const_iterator e = exp.end();
-    Token t;
+    Tokeniser t(s, e);
 
-    t = nextToken(s,e);
-    BOOST_CHECK_EQUAL(t, Token(qb::T_IDENTIFIER, "a"));
-    t = nextToken(s,e);
-    BOOST_CHECK_EQUAL(t, Token(qb::T_OPERATOR, "="));
-    t = nextToken(s,e);
-    BOOST_CHECK_EQUAL(t, Token(qb::T_IDENTIFIER, "b"));
-    t = nextToken(s,e);
-    BOOST_CHECK_EQUAL(t, Token(qb::T_EOS, ""));
+    BOOST_CHECK_EQUAL(t.nextToken(), Token(qb::T_IDENTIFIER, "a"));
+    BOOST_CHECK_EQUAL(t.nextToken(), Token(qb::T_OPERATOR, "="));
+    BOOST_CHECK_EQUAL(t.nextToken(), Token(qb::T_IDENTIFIER, "b"));
+    BOOST_CHECK_EQUAL(t.nextToken(), Token(qb::T_EOS, ""));
 
     exp = " not 'hello kitty''s friend' = Is null       ";
     s = exp.begin();
     e = exp.end();
+    Tokeniser u(s, e);
 
-    t = nextToken(s,e);
-    BOOST_CHECK_EQUAL(t, Token(qb::T_NOT, "not"));
-    t = nextToken(s,e);
-    BOOST_CHECK_EQUAL(t, Token(qb::T_STRING, "hello kitty's friend"));
-    t = nextToken(s,e);
-    BOOST_CHECK_EQUAL(t, Token(qb::T_OPERATOR, "="));
-    t = nextToken(s,e);
-    BOOST_CHECK_EQUAL(t, Token(qb::T_IS, "Is"));
-    t = nextToken(s,e);
-    BOOST_CHECK_EQUAL(t, Token(qb::T_NULL, "null"));
-    t = nextToken(s,e);
-    BOOST_CHECK_EQUAL(t, Token(qb::T_EOS, ""));
+    BOOST_CHECK_EQUAL(u.nextToken(), Token(qb::T_NOT, "not"));
+    BOOST_CHECK_EQUAL(u.nextToken(), Token(qb::T_STRING, "hello kitty's friend"));
+    BOOST_CHECK_EQUAL(u.nextToken(), Token(qb::T_OPERATOR, "="));
+    BOOST_CHECK_EQUAL(u.nextToken(), Token(qb::T_IS, "Is"));
+    BOOST_CHECK_EQUAL(u.nextToken(), Token(qb::T_NULL, "null"));
+    BOOST_CHECK_EQUAL(u.nextToken(), Token(qb::T_EOS, ""));
 }
 
 class TestSelectorEnv : public qpid::broker::SelectorEnv {
