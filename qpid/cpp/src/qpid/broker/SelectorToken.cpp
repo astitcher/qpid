@@ -240,9 +240,12 @@ Tokeniser::Tokeniser(const std::string::const_iterator& s, const std::string::co
  * Advance the string iterator past the parsed token on success. On failure the string iterator is 
  * in an undefined location.
  */
-Token Tokeniser::nextToken()
+const Token& Tokeniser::nextToken()
 {
     if ( tokens.size()>tokp ) return tokens[tokp++];
+
+    // Don't extend stream of tokens further than the end of stream;
+    if ( tokp>0 && tokens[tokp-1].type==T_EOS ) return tokens[tokp-1];
 
     skipWS(inp, inEnd);
 
@@ -261,7 +264,7 @@ Token Tokeniser::nextToken()
 
 void Tokeniser::returnTokens(unsigned int n)
 {
-    assert( n>=tokp );
+    assert( n<=tokp );
     tokp-=n;
 }
 

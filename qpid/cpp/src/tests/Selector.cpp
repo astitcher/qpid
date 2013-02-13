@@ -132,6 +132,13 @@ QPID_AUTO_TEST_CASE(tokenString)
     BOOST_CHECK_EQUAL(u.nextToken(), Token(qb::T_IS, "Is"));
     BOOST_CHECK_EQUAL(u.nextToken(), Token(qb::T_NULL, "null"));
     BOOST_CHECK_EQUAL(u.nextToken(), Token(qb::T_EOS, ""));
+    BOOST_CHECK_EQUAL(u.nextToken(), Token(qb::T_EOS, ""));
+
+    u.returnTokens(3);
+    BOOST_CHECK_EQUAL(u.nextToken(), Token(qb::T_IS, "Is"));
+    BOOST_CHECK_EQUAL(u.nextToken(), Token(qb::T_NULL, "null"));
+    BOOST_CHECK_EQUAL(u.nextToken(), Token(qb::T_EOS, ""));
+    BOOST_CHECK_EQUAL(u.nextToken(), Token(qb::T_EOS, ""));
 }
 
 class TestSelectorEnv : public qpid::broker::SelectorEnv {
