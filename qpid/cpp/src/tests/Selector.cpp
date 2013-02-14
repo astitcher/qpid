@@ -25,7 +25,6 @@
 #include "unit_test.h"
 
 #include <string>
-#include <iosfwd>
 #include <map>
 
 using std::string;
@@ -162,6 +161,10 @@ QPID_AUTO_TEST_CASE(parseString)
 {
     BOOST_CHECK_THROW(qb::Selector e("'Daft' is not null"), std::range_error);
     BOOST_CHECK_THROW(qb::Selector e("A is null not"), std::range_error);
+    BOOST_CHECK_THROW(qb::Selector e("A is null or not"), std::range_error);
+    BOOST_CHECK_THROW(qb::Selector e("A is null or and"), std::range_error);
+    BOOST_CHECK_THROW(qb::Selector e("A is null and 'hello out there'"), std::range_error);
+    BOOST_CHECK_THROW(qb::Selector e("A is null and (B='hello out there'"), std::range_error);
     BOOST_CHECK_THROW(qb::Selector e("in='hello kitty'"), std::range_error);
     qb::Selector a("A is not null");
     qb::Selector a1("A is null");
@@ -173,6 +176,13 @@ QPID_AUTO_TEST_CASE(parseString)
     qb::Selector e("A<>'hello kitty'");
     qb::Selector f("A=B");
     qb::Selector g("A<>B");
+    qb::Selector h("A='hello kitty' OR B='Bye, bye cruel world'");
+    qb::Selector i("B='hello kitty' OR A='Bye, bye cruel world'");
+    qb::Selector j("B='hello kitty' AnD A='Bye, bye cruel world'");
+    qb::Selector k("B='hello kitty' AnD B='Bye, bye cruel world'");
+    qb::Selector a4("A is null or A='Bye, bye cruel world'");
+    qb::Selector a5("Z is null OR A is not null and A<>'Bye, bye cruel world'");
+    qb::Selector a6("(Z is null OR A is not null) and A<>'Bye, bye cruel world'");
 
     TestSelectorEnv env;
     env.set("A", "Bye, bye cruel world");
@@ -188,6 +198,13 @@ QPID_AUTO_TEST_CASE(parseString)
     BOOST_CHECK(e.eval(env));
     BOOST_CHECK(!f.eval(env));
     BOOST_CHECK(g.eval(env));
+    BOOST_CHECK(!h.eval(env));
+    BOOST_CHECK(i.eval(env));
+    BOOST_CHECK(j.eval(env));
+    BOOST_CHECK(!k.eval(env));
+    BOOST_CHECK(a4.eval(env));
+    BOOST_CHECK(a5.eval(env));
+    BOOST_CHECK(!a6.eval(env));
 }
 
 QPID_AUTO_TEST_SUITE_END()

@@ -23,8 +23,11 @@
 
 #include "qpid/broker/Message.h"
 #include "qpid/broker/SelectorExpression.h"
+#include "qpid/log/Statement.h"
 
 #include <string>
+#include <sstream>
+
 #include <boost/make_shared.hpp>
 
 namespace qpid {
@@ -36,6 +39,13 @@ Selector::Selector(const string& e) :
     parse(parseTopBoolExpression(e)),
     expression(e)
 {
+    bool debugOut;
+    QPID_LOG_TEST(debug, debugOut);
+    if (debugOut) {
+        std::stringstream ss;
+        parse->repr(ss);
+        QPID_LOG(debug, "Selector parsed[" << e << "] into: " << ss.str());
+    }
 }
 
 Selector::~Selector()

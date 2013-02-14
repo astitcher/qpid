@@ -22,6 +22,7 @@
  *
  */
 
+#include <iosfwd>
 #include <string>
 
 namespace qpid {
@@ -30,9 +31,17 @@ namespace broker {
 class SelectorEnv;
 class Tokeniser;
 
+class Expression {
+public:
+    virtual ~Expression() {}
+    virtual void repr(std::ostream&) const = 0;
+    virtual std::string eval(const SelectorEnv&) const = 0;
+};
+
 class BoolExpression {
 public:
     virtual ~BoolExpression() {};
+    virtual void repr(std::ostream&) const = 0;
     virtual bool eval(const SelectorEnv&) const = 0;
 };
 
@@ -42,6 +51,7 @@ BoolExpression* parseOrExpression(Tokeniser&);
 BoolExpression* parseAndExpression(Tokeniser&);
 BoolExpression* parseNotExpression(Tokeniser&);
 BoolExpression* parseEqualityExpression(Tokeniser&);
+Expression* parsePrimaryExpression(Tokeniser&);
 
 }}
 

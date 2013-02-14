@@ -106,7 +106,7 @@ class Tokeniser {
 
 public:
     Tokeniser(const std::string::const_iterator& s, const std::string::const_iterator& e);
-    void returnTokens(unsigned int n);
+    void returnTokens(unsigned int n = 1);
     const Token& nextToken();
 };
 
