@@ -25,6 +25,37 @@
 
 #include <boost/make_shared.hpp>
 
+/*
+ * Syntax for JMS style selector expressions (informal):
+ *
+ * Alpha ::= "a".."z" | "A".."Z"
+ * Digit ::= "0".."9"
+ * IdentifierInitial ::= Alpha | "_" | "$"
+ * IdentifierPart ::= IdentifierInitial | Digit
+ * Identifier ::= IdentifierInitial IdentifierPart*
+ * Constraint : Identifier NOT IN ("NULL", "TRUE", "FALSE", "NOT", "AND", "OR", "BETWEEN", "LIKE", "IN", "IS") // Case insensitive
+ *
+ * LiteralString ::= ("'" ~[']* "'")+ // Repeats to cope with embedded single quote
+ *
+ * // Currently no numerics at all
+ * //Sign ::= "-" | "+"
+ * //LiteralExactNumeric ::= [Sign] Digit+
+ * //LiteralApproxNumeric ::= ( [Sign] Digit+ "." Digit* [ "E" LiteralExactNumeric ] ) |
+ * //                         ( [Sign] Digit+ "E" LiteralExactNumeric )
+ * //LiteralBool ::= "TRUE" | "FALSE"
+ * //
+ *
+ * Literal ::= LiteralBool | LiteralString //| LiteralApproxNumeric | LiteralExactNumeric
+ *
+ * // Currently only simple string comparison expressions + IS NULL or IS NOT NULL
+ * //OpsLogical ::= "AND" | "OR"
+ * OpsComparison ::= "=" | "<>" // | ">" | ">=" | "<" | "<="
+ *
+ * Comparison ::= (Identifier | Literal) OpsComparison (Identifier | Literal) |
+ *                Identifier "IS" "NULL" |
+ *                Identifier "IS "NOT" "NULL"
+ */
+
 namespace qpid {
 namespace broker {
 
