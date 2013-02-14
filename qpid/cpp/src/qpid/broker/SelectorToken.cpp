@@ -66,7 +66,7 @@ inline bool isIdentifierStart(char c)
 
 inline bool isIdentifierPart(char c)
 {
-    return std::isalnum(c) || c=='_' || c=='$';
+    return std::isalnum(c) || c=='_' || c=='$' || c=='.';
 }
 
 bool tokeniseIdentifier(std::string::const_iterator& s, std::string::const_iterator& e, Token& tok)

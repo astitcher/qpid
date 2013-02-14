@@ -36,7 +36,7 @@
  * Alpha ::= "a".."z" | "A".."Z"
  * Digit ::= "0".."9"
  * IdentifierInitial ::= Alpha | "_" | "$"
- * IdentifierPart ::= IdentifierInitial | Digit
+ * IdentifierPart ::= IdentifierInitial | Digit | "."
  * Identifier ::= IdentifierInitial IdentifierPart*
  * Constraint : Identifier NOT IN ("NULL", "TRUE", "FALSE", "NOT", "AND", "OR", "BETWEEN", "LIKE", "IN", "IS") // Case insensitive
  *

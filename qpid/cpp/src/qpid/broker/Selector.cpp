@@ -29,6 +29,7 @@
 #include <sstream>
 
 #include <boost/make_shared.hpp>
+#include <boost/lexical_cast.hpp>
 
 namespace qpid {
 namespace broker {
@@ -74,20 +75,54 @@ bool MessageSelectorEnv::present(const string& identifier) const
 }
 
 /**
- * Special property names
- * amqp.correlation_id | correlation-id field of properties section
- * amqp.durable | durable field of header section
- * amqp.to | to field of the properties section
- * amqp.absolute_expiry_time | absolute-expiry-time of properties section
- * amqp.message_id | message-id of properties section
- * amqp.priority | priority field of header section
- * amqp.delivery_count | delivery-count > 0 in header section (this seems more than a simple name substitution)
- * amqp.reply_to | reply-to in properties section
- * amqp.creation_time | creation-time of properties section
- * amqp.jms_type | annotation jms-type in message-annotations section
+ * Identifier  (amqp.)  | JMS...       | amqp 1.0 equivalent
+ * durable              |              | durable              header section
+ * delivery_mode        | DeliveryMode | [durable ? 'PERSISTENT' : 'NON_PERSISTENT'] (computed value)
+ * priority             | Priority     | priority             header section
+ * delivery_count       |              | delivery-count       header section
+ * redelivered          |[Redelivered] | (delivery_count>0)  (computed value)
+ * correlation_id       | CorrelationID| correlation-id       properties section
+ * to                   |[Destination] | to                   properties section
+ * absolute_expiry_time |[Expiration]  | absolute-expiry-time properties section
+ * message_id           | MessageID    | message-id           properties section
+ * reply_to             |[ReplyTo]     | reply-to             properties section
+ * creation_time        | Timestamp    | creation-time        properties section
+ * jms_type             | Type         | jms-type             message-annotations section
  */
+
+string specialValue(const Message& msg, const string& id)
+{
+    // Just use a simple if chain for now - improve this later
+    if ( id=="delivery_mode" ) {
+        return msg.getEncoding().isPersistent() ? "PERSISTENT" : "NON_PERSISTENT";
+    } else if ( id=="redelivered" ) {
+        return msg.getDeliveryCount()>0 ? "TRUE" : "FALSE";
+    } else if ( id=="priority" ) {
+        return boost::lexical_cast<string>(msg.getEncoding().getPriority());
+    } else if ( id=="correlation_id" ) {
+        return ""; // Needs an indirection in getEncoding().
+    } else if ( id=="message_id" ) {
+        return ""; // Needs an indirection in getEncoding().
+    } else if ( id=="to" ) {
+        return ""; // Needs an indirection in getEncoding().
+    } else if ( id=="reply_to" ) {
+        return ""; // Needs an indirection in getEncoding().
+    } else if ( id=="absolute_expiry_time" ) {
+        return ""; // Needs an indirection in getEncoding().
+    } else if ( id=="creation_time" ) {
+        return ""; // Needs an indirection in getEncoding().
+    } else if ( id=="jms_type" ) {
+        return msg.getAnnotation("jms-type");
+    } else return "";
+}
+
 string MessageSelectorEnv::value(const string& identifier) const
 {
+    // Check for amqp prefix and strip it if present
+    if (identifier.substr(0, 5) == "amqp.") {
+        return specialValue(msg, identifier.substr(5));
+    }
+
     // Just return property as string
     return msg.getPropertyAsString(identifier);
 }
