@@ -140,6 +140,17 @@ QPID_AUTO_TEST_CASE(tokenString)
     BOOST_CHECK_EQUAL(u.nextToken(), Token(qb::T_EOS, ""));
 }
 
+QPID_AUTO_TEST_CASE(parseStringFail)
+{
+    BOOST_CHECK_THROW(qb::Selector e("'Daft' is not null"), std::range_error);
+    BOOST_CHECK_THROW(qb::Selector e("A is null not"), std::range_error);
+    BOOST_CHECK_THROW(qb::Selector e("A is null or not"), std::range_error);
+    BOOST_CHECK_THROW(qb::Selector e("A is null or and"), std::range_error);
+    BOOST_CHECK_THROW(qb::Selector e("A is null and 'hello out there'"), std::range_error);
+    BOOST_CHECK_THROW(qb::Selector e("A is null and (B='hello out there'"), std::range_error);
+    BOOST_CHECK_THROW(qb::Selector e("in='hello kitty'"), std::range_error);
+}
+
 class TestSelectorEnv : public qpid::broker::SelectorEnv {
     map<string, string> values;
 
@@ -159,13 +170,6 @@ public:
 
 QPID_AUTO_TEST_CASE(parseString)
 {
-    BOOST_CHECK_THROW(qb::Selector e("'Daft' is not null"), std::range_error);
-    BOOST_CHECK_THROW(qb::Selector e("A is null not"), std::range_error);
-    BOOST_CHECK_THROW(qb::Selector e("A is null or not"), std::range_error);
-    BOOST_CHECK_THROW(qb::Selector e("A is null or and"), std::range_error);
-    BOOST_CHECK_THROW(qb::Selector e("A is null and 'hello out there'"), std::range_error);
-    BOOST_CHECK_THROW(qb::Selector e("A is null and (B='hello out there'"), std::range_error);
-    BOOST_CHECK_THROW(qb::Selector e("in='hello kitty'"), std::range_error);
     qb::Selector a("A is not null");
     qb::Selector a1("A is null");
     qb::Selector a2("A = C");
@@ -183,6 +187,8 @@ QPID_AUTO_TEST_CASE(parseString)
     qb::Selector a4("A is null or A='Bye, bye cruel world'");
     qb::Selector a5("Z is null OR A is not null and A<>'Bye, bye cruel world'");
     qb::Selector a6("(Z is null OR A is not null) and A<>'Bye, bye cruel world'");
+    qb::Selector t("NOT C is not null OR C is null");
+    qb::Selector n("Not A='' or B=z");
 
     TestSelectorEnv env;
     env.set("A", "Bye, bye cruel world");
@@ -205,6 +211,8 @@ QPID_AUTO_TEST_CASE(parseString)
     BOOST_CHECK(a4.eval(env));
     BOOST_CHECK(a5.eval(env));
     BOOST_CHECK(!a6.eval(env));
+    BOOST_CHECK(t.eval(env));
+    BOOST_CHECK(n.eval(env));
 }
 
 QPID_AUTO_TEST_SUITE_END()
