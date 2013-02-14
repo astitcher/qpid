@@ -123,6 +123,7 @@ bool tokeniseReservedWord(Token& tok)
     static const RWEntry reserved[] = {
         {"and", T_AND},
         {"between", T_BETWEEN},
+        {"escape", T_ESCAPE},
         {"false", T_FALSE},
         {"in", T_IN},
         {"is", T_IS},

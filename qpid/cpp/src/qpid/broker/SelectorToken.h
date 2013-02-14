@@ -42,6 +42,7 @@ typedef enum {
     T_IS,
     T_BETWEEN,
     T_LIKE,
+    T_ESCAPE,
     T_IDENTIFIER,
     T_STRING,
     T_NUMERIC_EXACT,
