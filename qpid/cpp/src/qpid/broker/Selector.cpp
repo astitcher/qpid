@@ -61,7 +61,18 @@ namespace broker {
 
 using std::string;
 
+class SelectorParseState {
+    const std::string& expression;
+
+public:
+    SelectorParseState(const std::string& e) :
+        expression(e)
+    {
+    }
+};
+
 Selector::Selector(const string& e) :
+    parseState(new SelectorParseState(e)),
     expression(e)
 {
 }
