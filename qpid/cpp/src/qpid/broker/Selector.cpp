@@ -73,6 +73,19 @@ bool MessageSelectorEnv::present(const string& identifier) const
     return !msg.getProperty(identifier).isVoid();
 }
 
+/**
+ * Special property names
+ * amqp.correlation_id | correlation-id field of properties section
+ * amqp.durable | durable field of header section
+ * amqp.to | to field of the properties section
+ * amqp.absolute_expiry_time | absolute-expiry-time of properties section
+ * amqp.message_id | message-id of properties section
+ * amqp.priority | priority field of header section
+ * amqp.delivery_count | delivery-count > 0 in header section (this seems more than a simple name substitution)
+ * amqp.reply_to | reply-to in properties section
+ * amqp.creation_time | creation-time of properties section
+ * amqp.jms_type | annotation jms-type in message-annotations section
+ */
 string MessageSelectorEnv::value(const string& identifier) const
 {
     // Just return property as string
