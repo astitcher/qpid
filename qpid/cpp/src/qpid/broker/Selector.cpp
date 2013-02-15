@@ -92,19 +92,19 @@ bool MessageSelectorEnv::present(const string& identifier) const
 
 string specialValue(const Message& msg, const string& id)
 {
-    // Just use a simple if chain for now - improve this later
+    // TODO: Just use a simple if chain for now - improve this later
     if ( id=="delivery_mode" ) {
         return msg.getEncoding().isPersistent() ? "PERSISTENT" : "NON_PERSISTENT";
     } else if ( id=="redelivered" ) {
         return msg.getDeliveryCount()>0 ? "TRUE" : "FALSE";
     } else if ( id=="priority" ) {
-        return boost::lexical_cast<string>(msg.getEncoding().getPriority());
+        return boost::lexical_cast<string>(static_cast<uint32_t>(msg.getEncoding().getPriority()));
     } else if ( id=="correlation_id" ) {
         return ""; // Needs an indirection in getEncoding().
     } else if ( id=="message_id" ) {
         return ""; // Needs an indirection in getEncoding().
     } else if ( id=="to" ) {
-        return ""; // Needs an indirection in getEncoding().
+        return msg.getRoutingKey(); // This is good for 0-10, not sure about 1.0
     } else if ( id=="reply_to" ) {
         return ""; // Needs an indirection in getEncoding().
     } else if ( id=="absolute_expiry_time" ) {
@@ -118,13 +118,17 @@ string specialValue(const Message& msg, const string& id)
 
 string MessageSelectorEnv::value(const string& identifier) const
 {
+    string v;
+
     // Check for amqp prefix and strip it if present
     if (identifier.substr(0, 5) == "amqp.") {
-        return specialValue(msg, identifier.substr(5));
+        v = specialValue(msg, identifier.substr(5));
+    } else {
+        // Just return property as string
+        v = msg.getPropertyAsString(identifier);
     }
-
-    // Just return property as string
-    return msg.getPropertyAsString(identifier);
+    QPID_LOG(debug, "Selector identifier: " << identifier << "->" << v);
+    return v;
 }
 
 
