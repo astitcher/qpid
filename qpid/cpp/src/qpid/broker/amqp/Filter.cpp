@@ -65,7 +65,8 @@ void Filter::onStringValue(const qpid::amqp::CharSequence& key, const qpid::amqp
             QPID_LOG(notice, "Skipping unrecognised string filter with key " << filter.key << " and descriptor " << filter.descriptor);
         }
     } else {
-        setSubjectFilter(filter);
+        if (filter.key=="qpid.selector") setSelectorFilter(filter);
+        else setSubjectFilter(filter);
     }
 }
 
@@ -86,6 +87,26 @@ void Filter::setSubjectFilter(const StringFilter& filter)
         QPID_LOG(notice, "Skipping filter with key " << filter.key << "; subject filter already set");
     } else {
         subjectFilter = filter;
+    }
+}
+
+bool Filter::hasSelectorFilter() const
+{
+    return !selectorFilter.value.empty();
+}
+
+std::string Filter::getSelectorFilter() const
+{
+    return selectorFilter.value;
+}
+
+
+void Filter::setSelectorFilter(const StringFilter& filter)
+{
+    if (hasSelectorFilter()) {
+        QPID_LOG(notice, "Skipping filter with key " << filter.key << "; selector filter already set");
+    } else {
+        selectorFilter = filter;
     }
 }
 
