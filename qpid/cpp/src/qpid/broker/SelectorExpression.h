@@ -30,12 +30,13 @@ namespace broker {
 
 class SelectorEnv;
 class Tokeniser;
+class Value;
 
 class Expression {
 public:
     virtual ~Expression() {}
     virtual void repr(std::ostream&) const = 0;
-    virtual std::string eval(const SelectorEnv&) const = 0;
+    virtual const Value* eval(const SelectorEnv&) const = 0;
 };
 
 class BoolExpression {

@@ -23,6 +23,7 @@
 
 #include "qpid/broker/Selector.h"
 #include "qpid/broker/SelectorToken.h"
+#include "qpid/sys/IntegerTypes.h"
 
 #include <string>
 #include <memory>
@@ -77,10 +78,33 @@
 namespace qpid {
 namespace broker {
 
-class Expression;
-
 using std::string;
 using std::ostream;
+
+class Value {
+public:
+    union {
+        bool        b;
+        uint64_t    i;
+        double      x;
+        string*     s;
+    };
+    enum {
+        T_BOOL,
+        T_STRING,
+        T_EXACT,
+        T_INEXACT
+    } type;
+
+    Value(const string& s0) :
+        s(new string(s0)),
+        type(T_STRING)
+    {}
+
+    ~Value() {
+        if ( type==T_STRING ) delete s;
+    }
+};
 
 // Operators
 
@@ -100,6 +124,17 @@ public:
 ////////////////////////////////////////////////////
 
 // Convenience outputters
+
+ostream& operator<<(ostream& os, const Value& v)
+{
+    switch (v.type) {
+        case Value::T_BOOL: os << v.b; break;
+        case Value::T_EXACT: os << v.i; break;
+        case Value::T_INEXACT: os << v.x; break;
+        case Value::T_STRING: os << *v.s; break;
+    };
+    return os;
+}
 
 ostream& operator<<(ostream& os, const Expression& e)
 {
@@ -212,7 +247,7 @@ public:
 // Expression types...
 
 class Literal : public Expression {
-    string value;
+    const Value value;
 
 public:
     Literal(const string& v) :
@@ -223,8 +258,8 @@ public:
         os << "'" << value << "'";
     }
 
-    string eval(const SelectorEnv&) const {
-        return value;
+    const Value* eval(const SelectorEnv&) const {
+        return &value;
     }
 };
 
@@ -240,8 +275,8 @@ public:
         os << "I:" << identifier;
     }
 
-    string eval(const SelectorEnv& env) const {
-        return env.value(identifier);
+    const Value* eval(const SelectorEnv& env) const {
+        return new Value(env.value(identifier));
     }
 
     bool present(const SelectorEnv& env) const {
