@@ -127,7 +127,11 @@ void ReceiverContext::configure(pn_terminus_t* source) const
         pn_data_put_map(filter);
         pn_data_enter(filter);
         pn_data_put_symbol(filter, convert("qpid.selector"));
+        pn_data_put_described(filter);
+        pn_data_enter(filter);
+        pn_data_put_symbol(filter, convert(qpid::amqp::filters::QPID_SELECTOR_FILTER_SYMBOL));
         pn_data_put_string(filter, convert(i->second));
+        pn_data_exit(filter);
         pn_data_exit(filter);
     }
     if (!address.getSubject().empty()) {
