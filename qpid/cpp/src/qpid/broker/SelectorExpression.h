@@ -22,6 +22,8 @@
  *
  */
 
+#include "qpid/sys/IntegerTypes.h"
+
 #include <iosfwd>
 #include <string>
 
@@ -30,7 +32,45 @@ namespace broker {
 
 class SelectorEnv;
 class Tokeniser;
-class Value;
+
+class Value {
+public:
+    union {
+        bool        b;
+        uint64_t    i;
+        double      x;
+        std::string*     s;
+    };
+    enum {
+        T_BOOL,
+        T_STRING,
+        T_EXACT,
+        T_INEXACT
+    } type;
+
+    Value(const std::string& s0) :
+        s(new std::string(s0)),
+        type(T_STRING)
+    {}
+
+    Value(const uint64_t i0) :
+        i(i0),
+        type(T_EXACT)
+    {}
+
+    Value(const double x0) :
+        x(x0),
+        type(T_INEXACT)
+    {}
+
+    Value(bool b0) :
+        b(b0)
+    {}
+
+    ~Value() {
+        if ( type==T_STRING ) delete s;
+    }
+};
 
 class Expression {
 public:

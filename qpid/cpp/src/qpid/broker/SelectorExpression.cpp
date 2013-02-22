@@ -30,6 +30,7 @@
 #include <ostream>
 
 #include <boost/scoped_ptr.hpp>
+#include <boost/lexical_cast.hpp>
 
 /*
  * Syntax for JMS style selector expressions (informal):
@@ -43,13 +44,11 @@
  *
  * LiteralString ::= ("'" ~[']* "'")+ // Repeats to cope with embedded single quote
  *
- * // Currently no numerics at all
- * //LiteralExactNumeric ::= Digit+
- * //LiteralApproxNumeric ::= ( Digit "." Digit* [ "E" LiteralExactNumeric ] ) |
- * //                         ( "." Digit+ [ "E" LiteralExactNumeric ] ) |
- * //                         ( Digit+ "E" LiteralExactNumeric )
- * //LiteralBool ::= "TRUE" | "FALSE"
- * //
+ * LiteralExactNumeric ::= Digit+
+ * LiteralApproxNumeric ::= ( Digit "." Digit* [ "E" LiteralExactNumeric ] ) |
+ *                          ( "." Digit+ [ "E" LiteralExactNumeric ] ) |
+ *                          ( Digit+ "E" LiteralExactNumeric )
+ * LiteralBool ::= "TRUE" | "FALSE"
  *
  * Literal ::= LiteralBool | LiteralString | LiteralApproxNumeric | LiteralExactNumeric
  *
@@ -71,7 +70,7 @@
  *                        "(" OrExpression ")"
  *
  * PrimaryExpression :: = Identifier |
- *                        LiteralString
+ *                        Literal
  *
  */
 
@@ -81,30 +80,131 @@ namespace broker {
 using std::string;
 using std::ostream;
 
-class Value {
+// Operations on values
+
+bool numeric(const Value& v) {
+    return v.type == Value::T_EXACT || v.type == Value::T_INEXACT;
+}
+
+class NumericPairBase {
 public:
-    union {
-        bool        b;
-        uint64_t    i;
-        double      x;
-        string*     s;
-    };
-    enum {
-        T_BOOL,
-        T_STRING,
-        T_EXACT,
-        T_INEXACT
-    } type;
+    virtual Value add() = 0;
+    virtual Value sub() = 0;
+    virtual Value mul() = 0;
+    virtual Value div() = 0;
 
-    Value(const string& s0) :
-        s(new string(s0)),
-        type(T_STRING)
-    {}
-
-    ~Value() {
-        if ( type==T_STRING ) delete s;
-    }
+    virtual bool eq() = 0;
+    virtual bool ne() = 0;
+    virtual bool ls() = 0;
+    virtual bool gr() = 0;
+    virtual bool le() = 0;
+    virtual bool ge() = 0;
 };
+
+template <typename T>
+class NumericPair : public NumericPairBase {
+    const T n1;
+    const T n2;
+
+    Value add() { return n1+n2; }
+    Value sub() { return n1-n2; }
+    Value mul() { return n1*n2; }
+    Value div() { return n1/n2; }
+
+    bool eq() { return n1==n2; }
+    bool ne() { return n1!=n2; }
+    bool ls() { return n1<n2; }
+    bool gr() { return n1>n2; }
+    bool le() { return n1<=n2; }
+    bool ge() { return n1>=n2; }
+
+public:
+    NumericPair(T x, T y) :
+        n1(x),
+        n2(y)
+    {}
+};
+
+NumericPairBase* promoteNumeric(const Value& v1, const Value& v2)
+{
+    if (!numeric(v1) || !numeric(v2)) return 0;
+
+    if (v1.type != v2.type) {
+        switch (v1.type) {
+        case Value::T_INEXACT: return new NumericPair<double>(v1.x, v2.i);
+        case Value::T_EXACT: return new NumericPair<double>(v1.i, v2.x);
+        default:
+            assert(false);
+        }
+    } else {
+        switch (v1.type) {
+        case Value::T_INEXACT: return new NumericPair<double>(v1.x, v2.x);
+        case Value::T_EXACT: return new NumericPair<uint64_t>(v1.i, v2.i);
+        default:
+            assert(false);
+        }
+    }
+}
+
+bool operator==(const Value& v1, const Value& v2)
+{
+    boost::scoped_ptr<NumericPairBase> nbp(promoteNumeric(v1, v2));
+    if (nbp) return nbp->eq();
+
+    if (v1.type != v2.type) return false;
+    switch (v1.type) {
+    case Value::T_BOOL: return v1.b == v2.b;
+    case Value::T_STRING: return *v1.s == *v2.s;
+    default: // Cannot ever get here
+        return false;
+    }
+}
+
+bool operator!=(const Value& v1, const Value& v2)
+{
+    boost::scoped_ptr<NumericPairBase> nbp(promoteNumeric(v1, v2));
+    if (nbp) return nbp->ne();
+
+    if (v1.type != v2.type) return false;
+    switch (v1.type) {
+    case Value::T_BOOL: return v1.b != v2.b;
+    case Value::T_STRING: return *v1.s != *v2.s;
+    default: // Cannot ever get here
+        return false;
+    }
+}
+
+bool operator<(const Value& v1, const Value& v2)
+{
+    boost::scoped_ptr<NumericPairBase> nbp(promoteNumeric(v1, v2));
+    if (nbp) return nbp->ls();
+
+    return false;
+}
+
+bool operator>(const Value& v1, const Value& v2)
+{
+    boost::scoped_ptr<NumericPairBase> nbp(promoteNumeric(v1, v2));
+    if (nbp) return nbp->gr();
+
+    return false;
+}
+
+bool operator<=(const Value& v1, const Value& v2)
+{
+    boost::scoped_ptr<NumericPairBase> nbp(promoteNumeric(v1, v2));
+    if (nbp) return nbp->le();
+
+    return false;
+}
+
+bool operator>=(const Value& v1, const Value& v2)
+{
+    boost::scoped_ptr<NumericPairBase> nbp(promoteNumeric(v1, v2));
+    if (nbp) return nbp->ge();
+
+    return false;
+}
 
 // Operators
 
@@ -250,7 +350,8 @@ class Literal : public Expression {
     const Value value;
 
 public:
-    Literal(const string& v) :
+    template <typename T>
+    Literal(const T& v) :
         value(v)
     {}
 
@@ -295,7 +396,9 @@ class Eq : public EqualityOperator {
     }
 
     bool eval(Expression& e1, Expression& e2, const SelectorEnv& env) const {
-        return e1.eval(env) == e2.eval(env);
+        const Value* v1;
+        const Value* v2;
+        return (v1 = e1.eval(env)) && (v2 = e2.eval(env)) && *v1 == *v2;
     }
 };
 
@@ -306,7 +409,9 @@ class Neq : public EqualityOperator {
     }
 
     bool eval(Expression& e1, Expression& e2, const SelectorEnv& env) const {
-        return e1.eval(env) != e2.eval(env);
+        const Value* v1;
+        const Value* v2;
+        return (v1 = e1.eval(env)) && (v2 = e2.eval(env)) && *v1 != *v2;
     }
 };
 
@@ -446,6 +551,14 @@ Expression* parsePrimaryExpression(Tokeniser& tokeniser)
             return new Identifier(t.val);
         case T_STRING:
             return new Literal(t.val);
+        case T_FALSE:
+            return new Literal(false);
+        case T_TRUE:
+            return new Literal(true);
+        case T_NUMERIC_EXACT:
+            return new Literal(boost::lexical_cast<uint64_t>(t.val));
+        case T_NUMERIC_APPROX:
+            return new Literal(boost::lexical_cast<double>(t.val));
         default:
             return 0;
     }
