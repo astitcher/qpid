@@ -86,6 +86,15 @@ QPID_AUTO_TEST_CASE(tokeniseSuccess)
     verifyTokeniserSuccess(&tokeniseOperator, "<> Identifier", qb::T_OPERATOR, "<>", " Identifier");
     verifyTokeniserSuccess(&tokeniseParens, "(a and b) not c", qb::T_LPAREN, "(", "a and b) not c");
     verifyTokeniserSuccess(&tokeniseParens, ") not c", qb::T_RPAREN, ")", " not c");
+    verifyTokeniserSuccess(&tokeniseNumeric, "019kill", qb::T_NUMERIC_EXACT, "019", "kill");
+    verifyTokeniserSuccess(&tokeniseNumeric, "0kill", qb::T_NUMERIC_EXACT, "0", "kill");
+    verifyTokeniserSuccess(&tokeniseNumeric, "0.kill", qb::T_NUMERIC_APPROX, "0.", "kill");
+    verifyTokeniserSuccess(&tokeniseNumeric, "3.1415=pi", qb::T_NUMERIC_APPROX, "3.1415", "=pi");
+    verifyTokeniserSuccess(&tokeniseNumeric, ".25.kill", qb::T_NUMERIC_APPROX, ".25", ".kill");
+    verifyTokeniserSuccess(&tokeniseNumeric, "2e5.kill", qb::T_NUMERIC_APPROX, "2e5", ".kill");
+    verifyTokeniserSuccess(&tokeniseNumeric, "3.e50easy to kill", qb::T_NUMERIC_APPROX, "3.e50", "easy to kill");
+    verifyTokeniserSuccess(&tokeniseNumeric, "34.25e+50easy to kill", qb::T_NUMERIC_APPROX, "34.25e+50", "easy to kill");
+    verifyTokeniserSuccess(&tokeniseNumeric, "34.e-50easy to kill", qb::T_NUMERIC_APPROX, "34.e-50", "easy to kill");
 }
 
 QPID_AUTO_TEST_CASE(tokeniseFailure)
@@ -105,6 +114,13 @@ QPID_AUTO_TEST_CASE(tokeniseFailure)
     verifyTokeniserFail(&tokeniseOperator, ")");
     verifyTokeniserFail(&tokeniseParens, "=");
     verifyTokeniserFail(&tokeniseParens, "what ho!");
+    verifyTokeniserFail(&tokeniseNumeric, "kill");
+    verifyTokeniserFail(&tokeniseNumeric, "e3");
+    verifyTokeniserFail(&tokeniseNumeric, "1.e.5");
+    verifyTokeniserFail(&tokeniseNumeric, ".e5");
+    verifyTokeniserFail(&tokeniseNumeric, "34e");
+    verifyTokeniserFail(&tokeniseNumeric, ".3e+");
+    verifyTokeniserFail(&tokeniseNumeric, ".3e-.");
 }
 
 QPID_AUTO_TEST_CASE(tokenString)
@@ -138,6 +154,21 @@ QPID_AUTO_TEST_CASE(tokenString)
     BOOST_CHECK_EQUAL(u.nextToken(), Token(qb::T_NULL, "null"));
     BOOST_CHECK_EQUAL(u.nextToken(), Token(qb::T_EOS, ""));
     BOOST_CHECK_EQUAL(u.nextToken(), Token(qb::T_EOS, ""));
+
+    exp = "(a+6)*7.5/1e6";
+    s = exp.begin();
+    e = exp.end();
+    Tokeniser v(s, e);
+
+    BOOST_CHECK_EQUAL(v.nextToken(), Token(qb::T_LPAREN, "("));
+    BOOST_CHECK_EQUAL(v.nextToken(), Token(qb::T_IDENTIFIER, "a"));
+    BOOST_CHECK_EQUAL(v.nextToken(), Token(qb::T_OPERATOR, "+"));
+    BOOST_CHECK_EQUAL(v.nextToken(), Token(qb::T_NUMERIC_EXACT, "6"));
+    BOOST_CHECK_EQUAL(v.nextToken(), Token(qb::T_RPAREN, ")"));
+    BOOST_CHECK_EQUAL(v.nextToken(), Token(qb::T_OPERATOR, "*"));
+    BOOST_CHECK_EQUAL(v.nextToken(), Token(qb::T_NUMERIC_APPROX, "7.5"));
+    BOOST_CHECK_EQUAL(v.nextToken(), Token(qb::T_OPERATOR, "/"));
+    BOOST_CHECK_EQUAL(v.nextToken(), Token(qb::T_NUMERIC_APPROX, "1e6"));
 }
 
 QPID_AUTO_TEST_CASE(parseStringFail)

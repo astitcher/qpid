@@ -45,9 +45,10 @@
  * LiteralString ::= ("'" ~[']* "'")+ // Repeats to cope with embedded single quote
  *
  * LiteralExactNumeric ::= Digit+
- * LiteralApproxNumeric ::= ( Digit "." Digit* [ "E" LiteralExactNumeric ] ) |
- *                          ( "." Digit+ [ "E" LiteralExactNumeric ] ) |
- *                          ( Digit+ "E" LiteralExactNumeric )
+ * Exponent ::= ['+'|'-'] LiteralExactNumeric
+ * LiteralApproxNumeric ::= ( Digit "." Digit* [ "E" Exponent ] ) |
+ *                          ( "." Digit+ [ "E" Exponent ] ) |
+ *                          ( Digit+ "E" Exponent )
  * LiteralBool ::= "TRUE" | "FALSE"
  *
  * Literal ::= LiteralBool | LiteralString | LiteralApproxNumeric | LiteralExactNumeric
