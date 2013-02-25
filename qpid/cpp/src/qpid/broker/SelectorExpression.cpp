@@ -81,10 +81,17 @@ namespace broker {
 using std::string;
 using std::ostream;
 
+namespace {
 // Operations on values
+
+bool unknown(const Value& v) {
+    return v.type == Value::T_UNKNOWN;
+}
 
 bool numeric(const Value& v) {
     return v.type == Value::T_EXACT || v.type == Value::T_INEXACT;
+}
+
 }
 
 class NumericPairBase {
@@ -229,10 +236,11 @@ public:
 ostream& operator<<(ostream& os, const Value& v)
 {
     switch (v.type) {
-        case Value::T_BOOL: os << v.b; break;
-        case Value::T_EXACT: os << v.i; break;
-        case Value::T_INEXACT: os << v.x; break;
-        case Value::T_STRING: os << *v.s; break;
+    case Value::T_UNKNOWN: os << "UNKNOWN"; break;
+    case Value::T_BOOL: os << "BOOL[" << std::boolalpha << v.b << "]"; break;
+    case Value::T_EXACT: os << "EXACT[" << v.i << "]"; break;
+    case Value::T_INEXACT: os << "APPROX[" << v.x << "]"; break;
+    case Value::T_STRING: os << "'" << *v.s << "'"; break;
     };
     return os;
 }
@@ -357,11 +365,11 @@ public:
     {}
 
     void repr(ostream& os) const {
-        os << "'" << value << "'";
+        os << value;
     }
 
-    const Value* eval(const SelectorEnv&) const {
-        return &value;
+    Value eval(const SelectorEnv&) const {
+        return value;
     }
 };
 
@@ -377,12 +385,8 @@ public:
         os << "I:" << identifier;
     }
 
-    const Value* eval(const SelectorEnv& env) const {
-        return new Value(env.value(identifier));
-    }
-
-    bool present(const SelectorEnv& env) const {
-        return env.present(identifier);
+    Value eval(const SelectorEnv& env) const {
+        return env.present(identifier) ? Value(env.value(identifier)) : Value();
     }
 };
 
@@ -397,9 +401,14 @@ class Eq : public EqualityOperator {
     }
 
     bool eval(Expression& e1, Expression& e2, const SelectorEnv& env) const {
-        const Value* v1;
-        const Value* v2;
-        return (v1 = e1.eval(env)) && (v2 = e2.eval(env)) && *v1 == *v2;
+        const Value v1(e1.eval(env));
+        if (!unknown(v1)) {
+            const Value v2(e2.eval(env));
+            if (!unknown(v2)) {
+                return v1 == v2;
+            }
+        }
+        return false;
     }
 };
 
@@ -410,9 +419,14 @@ class Neq : public EqualityOperator {
     }
 
     bool eval(Expression& e1, Expression& e2, const SelectorEnv& env) const {
-        const Value* v1;
-        const Value* v2;
-        return (v1 = e1.eval(env)) && (v2 = e2.eval(env)) && *v1 != *v2;
+        const Value v1(e1.eval(env));
+        if (!unknown(v1)) {
+            const Value v2(e2.eval(env));
+            if (!unknown(v2)) {
+                return v1 != v2;
+            }
+        }
+        return false;
     }
 };
 
@@ -423,7 +437,7 @@ class IsNull : public UnaryBooleanOperator<Identifier> {
     }
 
     bool eval(Identifier& i, const SelectorEnv& env) const {
-        return !i.present(env);
+        return unknown(i.eval(env));
     }
 };
 
@@ -434,7 +448,7 @@ class IsNonNull : public UnaryBooleanOperator<Identifier> {
     }
 
     bool eval(Identifier& i, const SelectorEnv& env) const {
-        return i.present(env);
+        return !unknown(i.eval(env));
     }
 };
 

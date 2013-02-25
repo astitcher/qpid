@@ -42,11 +42,28 @@ public:
         std::string*     s;
     };
     enum {
+        T_UNKNOWN,
         T_BOOL,
         T_STRING,
         T_EXACT,
         T_INEXACT
     } type;
+
+    Value() :
+        type(T_UNKNOWN)
+    {}
+
+    Value(const Value& v) :
+        type(v.type)
+    {
+        switch (type) {
+        case T_UNKNOWN: break;
+        case T_BOOL: b = v.b; break;
+        case T_STRING: s = new std::string(*v.s); break;
+        case T_EXACT: i = v.i; break;
+        case T_INEXACT: x = v.x; break;
+        }
+    }
 
     Value(const std::string& s0) :
         s(new std::string(s0)),
@@ -64,7 +81,8 @@ public:
     {}
 
     Value(bool b0) :
-        b(b0)
+        b(b0),
+        type(T_BOOL)
     {}
 
     ~Value() {
@@ -76,7 +94,7 @@ class Expression {
 public:
     virtual ~Expression() {}
     virtual void repr(std::ostream&) const = 0;
-    virtual const Value* eval(const SelectorEnv&) const = 0;
+    virtual Value eval(const SelectorEnv&) const = 0;
 };
 
 class BoolExpression {
