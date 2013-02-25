@@ -183,13 +183,14 @@ QPID_AUTO_TEST_CASE(parseStringFail)
 
 class TestSelectorEnv : public qpid::broker::SelectorEnv {
     map<string, string> values;
+    static const string EMPTY;
 
     bool present(const std::string& v) const {
         return values.find(v)!=values.end();
     }
 
-    std::string value(const std::string& v) const {
-        return present(v) ? values.at(v) : "";
+    const std::string& value(const std::string& v) const {
+        return present(v) ? values.at(v) : EMPTY;
     }
 
 public:
@@ -197,6 +198,8 @@ public:
         values[id] = value;
     }
 };
+
+const string TestSelectorEnv::EMPTY;
 
 QPID_AUTO_TEST_CASE(parseString)
 {

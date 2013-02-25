@@ -43,14 +43,14 @@ public:
     virtual ~SelectorEnv() {};
 
     virtual bool present(const std::string&) const = 0;
-    virtual std::string value(const std::string&) const = 0;
+    virtual const std::string& value(const std::string&) const = 0;
 };
 
 class MessageSelectorEnv : public SelectorEnv {
     const Message& msg;
 
     bool present(const std::string&) const;
-    std::string value(const std::string&) const;
+    const std::string& value(const std::string&) const;
 
 public:
     MessageSelectorEnv(const Message&);

@@ -33,13 +33,16 @@ namespace broker {
 class SelectorEnv;
 class Tokeniser;
 
+// The user of the Value class for strings must ensure that
+// the string has a lifetime longer than the string used and
+// is responsoble for managing its lifetime.
 class Value {
 public:
     union {
-        bool        b;
-        uint64_t    i;
-        double      x;
-        std::string*     s;
+        bool         b;
+        uint64_t     i;
+        double       x;
+        const std::string* s;
     };
     enum {
         T_UNKNOWN,
@@ -49,24 +52,15 @@ public:
         T_INEXACT
     } type;
 
+    // Default copy contructor
+    // Default assignment operator
+    // Default destructor
     Value() :
         type(T_UNKNOWN)
     {}
 
-    Value(const Value& v) :
-        type(v.type)
-    {
-        switch (type) {
-        case T_UNKNOWN: break;
-        case T_BOOL: b = v.b; break;
-        case T_STRING: s = new std::string(*v.s); break;
-        case T_EXACT: i = v.i; break;
-        case T_INEXACT: x = v.x; break;
-        }
-    }
-
     Value(const std::string& s0) :
-        s(new std::string(s0)),
+        s(&s0),
         type(T_STRING)
     {}
 
@@ -84,10 +78,6 @@ public:
         b(b0),
         type(T_BOOL)
     {}
-
-    ~Value() {
-        if ( type==T_STRING ) delete s;
-    }
 };
 
 class Expression {

@@ -373,6 +373,23 @@ public:
     }
 };
 
+class StringLiteral : public Expression {
+    const string value;
+
+public:
+    StringLiteral(const string& v) :
+        value(v)
+    {}
+
+    void repr(ostream& os) const {
+        os << "'" << value << "'";
+    }
+
+    Value eval(const SelectorEnv&) const {
+        return value;
+    }
+};
+
 class Identifier : public Expression {
     string identifier;
 
@@ -616,7 +633,7 @@ Expression* parsePrimaryExpression(Tokeniser& tokeniser)
         case T_IDENTIFIER:
             return new Identifier(t.val);
         case T_STRING:
-            return new Literal(t.val);
+            return new StringLiteral(t.val);
         case T_FALSE:
             return new Literal(false);
         case T_TRUE:

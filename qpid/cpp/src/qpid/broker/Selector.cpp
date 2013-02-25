@@ -24,6 +24,7 @@
 #include "qpid/broker/Message.h"
 #include "qpid/broker/SelectorExpression.h"
 #include "qpid/log/Statement.h"
+#include "qpid/types/Variant.h"
 
 #include <string>
 #include <sstream>
@@ -90,47 +91,61 @@ bool MessageSelectorEnv::present(const string& identifier) const
  * jms_type             | Type         | jms-type             message-annotations section
  */
 
-string specialValue(const Message& msg, const string& id)
+#if 1
+const string EMPTY;
+const string PERSISTENT("PERSISTENT");
+const string NON_PERSISTENT("NON_PERSISTENT");
+const string TRUE("TRUE");
+const string FALSE("FALSE");
+
+const string* specialValue(const Message& msg, const string& id)
 {
     // TODO: Just use a simple if chain for now - improve this later
     if ( id=="delivery_mode" ) {
-        return msg.getEncoding().isPersistent() ? "PERSISTENT" : "NON_PERSISTENT";
+        return msg.getEncoding().isPersistent() ? &PERSISTENT : &NON_PERSISTENT;
     } else if ( id=="redelivered" ) {
-        return msg.getDeliveryCount()>0 ? "TRUE" : "FALSE";
+        return msg.getDeliveryCount()>0 ? &TRUE : &FALSE;
     } else if ( id=="priority" ) {
-        return boost::lexical_cast<string>(static_cast<uint32_t>(msg.getEncoding().getPriority()));
+        return &EMPTY;
     } else if ( id=="correlation_id" ) {
-        return ""; // Needs an indirection in getEncoding().
+        return &EMPTY; // Needs an indirection in getEncoding().
     } else if ( id=="message_id" ) {
-        return ""; // Needs an indirection in getEncoding().
+        return &EMPTY; // Needs an indirection in getEncoding().
     } else if ( id=="to" ) {
-        return msg.getRoutingKey(); // This is good for 0-10, not sure about 1.0
+        return &EMPTY; // This is good for 0-10, not sure about 1.0
     } else if ( id=="reply_to" ) {
-        return ""; // Needs an indirection in getEncoding().
+        return &EMPTY; // Needs an indirection in getEncoding().
     } else if ( id=="absolute_expiry_time" ) {
-        return ""; // Needs an indirection in getEncoding().
+        return &EMPTY; // Needs an indirection in getEncoding().
     } else if ( id=="creation_time" ) {
-        return ""; // Needs an indirection in getEncoding().
+        return &EMPTY; // Needs an indirection in getEncoding().
     } else if ( id=="jms_type" ) {
-        return msg.getAnnotation("jms-type");
-    } else return "";
+        return &EMPTY;
+    } else return &EMPTY;
 }
 
-string MessageSelectorEnv::value(const string& identifier) const
+const string& MessageSelectorEnv::value(const string& identifier) const
 {
-    string v;
+    const string* v;
 
     // Check for amqp prefix and strip it if present
     if (identifier.substr(0, 5) == "amqp.") {
         v = specialValue(msg, identifier.substr(5));
     } else {
         // Just return property as string
-        v = msg.getPropertyAsString(identifier);
+        //v = &msg.getPropertyAsString(identifier);
+        qpid::types::Variant var = msg.getProperty(identifier);
+        v = var.getType()==types::VAR_STRING ? &var.getString() : &EMPTY;
     }
     QPID_LOG(debug, "Selector identifier: " << identifier << "->" << v);
-    return v;
+    return *v;
 }
-
+#else
+const string Empty;
+const string& MessageSelectorEnv::value(const string& /*identifier*/) const {
+    return Empty;
+}
+#endif
 
 namespace {
 const boost::shared_ptr<Selector> NULL_SELECTOR = boost::shared_ptr<Selector>();
