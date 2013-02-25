@@ -64,8 +64,8 @@
  *
  * AndExpression :: = EqualityExpression ( "AND" EqualityExpression  )*
  *
- * EqualityExpression ::= Identifier "IS" "NULL" |
- *                        Identifier "IS "NOT" "NULL" |
+ * EqualityExpression ::= PrimaryExpression "IS" "NULL" |
+ *                        PrimaryExpression "IS "NOT" "NULL" |
  *                        PrimaryExpression EqOps PrimaryExpression |
  *                        "NOT" EqualityExpression |
  *                        "(" OrExpression ")"
@@ -431,24 +431,24 @@ class Neq : public EqualityOperator {
 };
 
 // "IS NULL"
-class IsNull : public UnaryBooleanOperator<Identifier> {
+class IsNull : public UnaryBooleanOperator<Expression> {
     void repr(ostream& os) const {
         os << "IsNull";
     }
 
-    bool eval(Identifier& i, const SelectorEnv& env) const {
-        return unknown(i.eval(env));
+    bool eval(Expression& e, const SelectorEnv& env) const {
+        return unknown(e.eval(env));
     }
 };
 
 // "IS NOT NULL"
-class IsNonNull : public UnaryBooleanOperator<Identifier> {
+class IsNonNull : public UnaryBooleanOperator<Expression> {
     void repr(ostream& os) const {
         os << "IsNonNull";
     }
 
-    bool eval(Identifier& i, const SelectorEnv& env) const {
-        return !unknown(i.eval(env));
+    bool eval(Expression& e, const SelectorEnv& env) const {
+        return !unknown(e.eval(env));
     }
 };
 
@@ -514,22 +514,7 @@ BoolExpression* parseAndExpression(Tokeniser& tokeniser)
 BoolExpression* parseEqualityExpression(Tokeniser& tokeniser)
 {
     const Token t = tokeniser.nextToken();
-    if ( t.type==T_IDENTIFIER ) {
-        // Check for "IS NULL" and "IS NOT NULL"
-        if ( tokeniser.nextToken().type==T_IS ) {
-            // The rest must be T_NULL or T_NOT, T_NULL
-            switch (tokeniser.nextToken().type) {
-            case T_NULL:
-                return new UnaryBooleanExpression<Identifier>(&isNullOp, new Identifier(t.val));
-            case T_NOT:
-                if ( tokeniser.nextToken().type == T_NULL)
-                    return new UnaryBooleanExpression<Identifier>(&isNonNullOp, new Identifier(t.val));
-            default:
-                return 0;
-            }
-        }
-        tokeniser.returnTokens();
-    } else if ( t.type==T_LPAREN ) {
+    if ( t.type==T_LPAREN ) {
         std::auto_ptr<BoolExpression> e(parseOrExpression(tokeniser));
         if (!e.get()) return 0;
         if ( tokeniser.nextToken().type!=T_RPAREN ) return 0;
@@ -543,6 +528,21 @@ BoolExpression* parseEqualityExpression(Tokeniser& tokeniser)
     tokeniser.returnTokens();
     std::auto_ptr<Expression> e1(parsePrimaryExpression(tokeniser));
     if (!e1.get()) return 0;
+
+    // Check for "IS NULL" and "IS NOT NULL"
+    if ( tokeniser.nextToken().type==T_IS ) {
+        // The rest must be T_NULL or T_NOT, T_NULL
+        switch (tokeniser.nextToken().type) {
+            case T_NULL:
+                return new UnaryBooleanExpression<Expression>(&isNullOp, e1.release());
+            case T_NOT:
+                if ( tokeniser.nextToken().type == T_NULL)
+                    return new UnaryBooleanExpression<Expression>(&isNonNullOp, e1.release());
+            default:
+                return 0;
+        }
+    }
+    tokeniser.returnTokens();
 
     const Token op = tokeniser.nextToken();
     if (op.type != T_OPERATOR) {

@@ -173,7 +173,6 @@ QPID_AUTO_TEST_CASE(tokenString)
 
 QPID_AUTO_TEST_CASE(parseStringFail)
 {
-    BOOST_CHECK_THROW(qb::Selector e("'Daft' is not null"), std::range_error);
     BOOST_CHECK_THROW(qb::Selector e("A is null not"), std::range_error);
     BOOST_CHECK_THROW(qb::Selector e("A is null or not"), std::range_error);
     BOOST_CHECK_THROW(qb::Selector e("A is null or and"), std::range_error);
@@ -201,20 +200,18 @@ public:
 
 QPID_AUTO_TEST_CASE(parseString)
 {
+    BOOST_CHECK_NO_THROW(qb::Selector e("'Daft' is not null"));
+    BOOST_CHECK_NO_THROW(qb::Selector e("42 is null"));
     BOOST_CHECK_NO_THROW(qb::Selector e("A is not null"));
     BOOST_CHECK_NO_THROW(qb::Selector e("A is null"));
     BOOST_CHECK_NO_THROW(qb::Selector e("A = C"));
     BOOST_CHECK_NO_THROW(qb::Selector e("A <> C"));
-    BOOST_CHECK_NO_THROW(qb::Selector e("C is not null"));
-    BOOST_CHECK_NO_THROW(qb::Selector e("C is null"));
     BOOST_CHECK_NO_THROW(qb::Selector e("A='hello kitty'"));
     BOOST_CHECK_NO_THROW(qb::Selector e("A<>'hello kitty'"));
     BOOST_CHECK_NO_THROW(qb::Selector e("A=B"));
     BOOST_CHECK_NO_THROW(qb::Selector e("A<>B"));
     BOOST_CHECK_NO_THROW(qb::Selector e("A='hello kitty' OR B='Bye, bye cruel world'"));
-    BOOST_CHECK_NO_THROW(qb::Selector e("B='hello kitty' OR A='Bye, bye cruel world'"));
     BOOST_CHECK_NO_THROW(qb::Selector e("B='hello kitty' AnD A='Bye, bye cruel world'"));
-    BOOST_CHECK_NO_THROW(qb::Selector e("B='hello kitty' AnD B='Bye, bye cruel world'"));
     BOOST_CHECK_NO_THROW(qb::Selector e("A is null or A='Bye, bye cruel world'"));
     BOOST_CHECK_NO_THROW(qb::Selector e("Z is null OR A is not null and A<>'Bye, bye cruel world'"));
     BOOST_CHECK_NO_THROW(qb::Selector e("(Z is null OR A is not null) and A<>'Bye, bye cruel world'"));
@@ -248,6 +245,8 @@ QPID_AUTO_TEST_CASE(simpleEval)
     qb::Selector m("Not A=17 or B=5.6");
     qb::Selector m1("A<>17 and B=5.6e17");
     qb::Selector null("C=D");
+    qb::Selector null1("13 is not null");
+    qb::Selector null2("'boo!' is null");
 
     TestSelectorEnv env;
     env.set("A", "Bye, bye cruel world");
@@ -275,6 +274,8 @@ QPID_AUTO_TEST_CASE(simpleEval)
     BOOST_CHECK(m.eval(env));
     BOOST_CHECK(!m1.eval(env));
     BOOST_CHECK(!null.eval(env));
+    BOOST_CHECK(null1.eval(env));
+    BOOST_CHECK(!null2.eval(env));
 }
 
 QPID_AUTO_TEST_SUITE_END()
