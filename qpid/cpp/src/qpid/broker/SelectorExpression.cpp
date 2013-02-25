@@ -64,10 +64,10 @@
  *
  * AndExpression :: = EqualityExpression ( "AND" EqualityExpression  )*
  *
- * EqualityExpression ::= PrimaryExpression "IS" "NULL" |
+ * ComparisonExpression ::= PrimaryExpression "IS" "NULL" |
  *                        PrimaryExpression "IS "NOT" "NULL" |
- *                        PrimaryExpression EqOps PrimaryExpression |
- *                        "NOT" EqualityExpression |
+ *                        PrimaryExpression ComparisonOpsOps PrimaryExpression |
+ *                        "NOT" ComparisonExpression |
  *                        "(" OrExpression ")"
  *
  * PrimaryExpression :: = Identifier |
@@ -216,7 +216,7 @@ bool operator>=(const Value& v1, const Value& v2)
 
 // Operators
 
-class EqualityOperator {
+class ComparisonOperator {
 public:
     virtual void repr(ostream&) const = 0;
     virtual bool eval(Expression&, Expression&, const SelectorEnv&) const = 0;
@@ -257,7 +257,7 @@ ostream& operator<<(ostream& os, const BoolExpression& e)
     return os;
 }
 
-ostream& operator<<(ostream& os, const EqualityOperator& e)
+ostream& operator<<(ostream& os, const ComparisonOperator& e)
 {
     e.repr(os);
     return os;
@@ -272,13 +272,13 @@ ostream& operator<<(ostream& os, const UnaryBooleanOperator<T>& e)
 
 // Boolean Expression types...
 
-class EqualityExpression : public BoolExpression {
-    EqualityOperator* op;
+class ComparisonExpression : public BoolExpression {
+    ComparisonOperator* op;
     boost::scoped_ptr<Expression> e1;
     boost::scoped_ptr<Expression> e2;
 
 public:
-    EqualityExpression(EqualityOperator* o, Expression* e, Expression* e_):
+    ComparisonExpression(ComparisonOperator* o, Expression* e, Expression* e_):
         op(o),
         e1(e),
         e2(e_)
@@ -394,39 +394,82 @@ public:
 
 // Some operators...
 
+typedef bool BoolOp(const Value&, const Value&);
+
+bool booleval(BoolOp* op, Expression& e1, Expression& e2, const SelectorEnv& env) {
+    const Value v1(e1.eval(env));
+    if (!unknown(v1)) {
+        const Value v2(e2.eval(env));
+        if (!unknown(v2)) {
+            return op(v1, v2);
+        }
+    }
+    return false;
+}
+
 // "="
-class Eq : public EqualityOperator {
+class Eq : public ComparisonOperator {
     void repr(ostream& os) const {
         os << "=";
     }
 
     bool eval(Expression& e1, Expression& e2, const SelectorEnv& env) const {
-        const Value v1(e1.eval(env));
-        if (!unknown(v1)) {
-            const Value v2(e2.eval(env));
-            if (!unknown(v2)) {
-                return v1 == v2;
-            }
-        }
-        return false;
+        return booleval(&operator==, e1, e2, env);
     }
 };
 
 // "<>"
-class Neq : public EqualityOperator {
+class Neq : public ComparisonOperator {
     void repr(ostream& os) const {
         os << "<>";
     }
 
     bool eval(Expression& e1, Expression& e2, const SelectorEnv& env) const {
-        const Value v1(e1.eval(env));
-        if (!unknown(v1)) {
-            const Value v2(e2.eval(env));
-            if (!unknown(v2)) {
-                return v1 != v2;
-            }
-        }
-        return false;
+        return booleval(&operator!=, e1, e2, env);
+    }
+};
+
+// "<"
+class Ls : public ComparisonOperator {
+    void repr(ostream& os) const {
+        os << "<";
+    }
+
+    bool eval(Expression& e1, Expression& e2, const SelectorEnv& env) const {
+        return booleval(&operator<, e1, e2, env);
+    }
+};
+
+// ">"
+class Gr : public ComparisonOperator {
+    void repr(ostream& os) const {
+        os << ">";
+    }
+
+    bool eval(Expression& e1, Expression& e2, const SelectorEnv& env) const {
+        return booleval(&operator>, e1, e2, env);
+    }
+};
+
+// "<="
+class Lseq : public ComparisonOperator {
+    void repr(ostream& os) const {
+        os << "<=";
+    }
+
+    bool eval(Expression& e1, Expression& e2, const SelectorEnv& env) const {
+        return booleval(&operator<=, e1, e2, env);
+    }
+};
+
+// ">="
+class Greq : public ComparisonOperator {
+    void repr(ostream& os) const {
+        os << ">=";
+    }
+
+    bool eval(Expression& e1, Expression& e2, const SelectorEnv& env) const {
+        return booleval(&operator>=, e1, e2, env);
     }
 };
 
@@ -465,6 +508,10 @@ class Not : public UnaryBooleanOperator<BoolExpression> {
 
 Eq eqOp;
 Neq neqOp;
+Ls lsOp;
+Gr grOp;
+Lseq lseqOp;
+Greq greqOp;
 IsNull isNullOp;
 IsNonNull isNonNullOp;
 Not notOp;
@@ -552,8 +599,12 @@ BoolExpression* parseEqualityExpression(Tokeniser& tokeniser)
     std::auto_ptr<Expression> e2(parsePrimaryExpression(tokeniser));
     if (!e2.get()) return 0;
 
-    if (op.val == "=") return new EqualityExpression(&eqOp, e1.release(), e2.release());
-    if (op.val == "<>") return new EqualityExpression(&neqOp, e1.release(), e2.release());
+    if (op.val == "=") return new ComparisonExpression(&eqOp, e1.release(), e2.release());
+    if (op.val == "<>") return new ComparisonExpression(&neqOp, e1.release(), e2.release());
+    if (op.val == "<") return new ComparisonExpression(&lsOp, e1.release(), e2.release());
+    if (op.val == ">") return new ComparisonExpression(&grOp, e1.release(), e2.release());
+    if (op.val == "<=") return new ComparisonExpression(&lseqOp, e1.release(), e2.release());
+    if (op.val == ">=") return new ComparisonExpression(&greqOp, e1.release(), e2.release());
 
     return 0;
 }

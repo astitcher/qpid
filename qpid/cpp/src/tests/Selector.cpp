@@ -223,59 +223,47 @@ QPID_AUTO_TEST_CASE(parseString)
 
 QPID_AUTO_TEST_CASE(simpleEval)
 {
-    qb::Selector a("A is not null");
-    qb::Selector a1("A is null");
-    qb::Selector a2("A = C");
-    qb::Selector a3("A <> C");
-    qb::Selector c("C is not null");
-    qb::Selector c1("C is null");
-    qb::Selector d("A='hello kitty'");
-    qb::Selector e("A<>'hello kitty'");
-    qb::Selector f("A=B");
-    qb::Selector g("A<>B");
-    qb::Selector h("A='hello kitty' OR B='Bye, bye cruel world'");
-    qb::Selector i("B='hello kitty' OR A='Bye, bye cruel world'");
-    qb::Selector j("B='hello kitty' AnD A='Bye, bye cruel world'");
-    qb::Selector k("B='hello kitty' AnD B='Bye, bye cruel world'");
-    qb::Selector a4("A is null or A='Bye, bye cruel world'");
-    qb::Selector a5("Z is null OR A is not null and A<>'Bye, bye cruel world'");
-    qb::Selector a6("(Z is null OR A is not null) and A<>'Bye, bye cruel world'");
-    qb::Selector t("NOT C is not null OR C is null");
-    qb::Selector n("Not A='' or B=z");
-    qb::Selector m("Not A=17 or B=5.6");
-    qb::Selector m1("A<>17 and B=5.6e17");
-    qb::Selector null("C=D");
-    qb::Selector null1("13 is not null");
-    qb::Selector null2("'boo!' is null");
-
     TestSelectorEnv env;
     env.set("A", "Bye, bye cruel world");
     env.set("B", "hello kitty");
 
-    BOOST_CHECK(a.eval(env));
-    BOOST_CHECK(!a1.eval(env));
-    BOOST_CHECK(!a2.eval(env));
-    BOOST_CHECK(!a3.eval(env));
-    BOOST_CHECK(!c.eval(env));
-    BOOST_CHECK(c1.eval(env));
-    BOOST_CHECK(!d.eval(env));
-    BOOST_CHECK(e.eval(env));
-    BOOST_CHECK(!f.eval(env));
-    BOOST_CHECK(g.eval(env));
-    BOOST_CHECK(!h.eval(env));
-    BOOST_CHECK(i.eval(env));
-    BOOST_CHECK(j.eval(env));
-    BOOST_CHECK(!k.eval(env));
-    BOOST_CHECK(a4.eval(env));
-    BOOST_CHECK(a5.eval(env));
-    BOOST_CHECK(!a6.eval(env));
-    BOOST_CHECK(t.eval(env));
-    BOOST_CHECK(n.eval(env));
-    BOOST_CHECK(m.eval(env));
-    BOOST_CHECK(!m1.eval(env));
-    BOOST_CHECK(!null.eval(env));
-    BOOST_CHECK(null1.eval(env));
-    BOOST_CHECK(!null2.eval(env));
+    BOOST_CHECK(qb::Selector("A is not null").eval(env));
+    BOOST_CHECK(!qb::Selector("A is null").eval(env));
+    BOOST_CHECK(!qb::Selector("A = C").eval(env));
+    BOOST_CHECK(!qb::Selector("A <> C").eval(env));
+    BOOST_CHECK(!qb::Selector("C is not null").eval(env));
+    BOOST_CHECK(qb::Selector("C is null").eval(env));
+    BOOST_CHECK(!qb::Selector("A='hello kitty'").eval(env));
+    BOOST_CHECK(qb::Selector("A<>'hello kitty'").eval(env));
+    BOOST_CHECK(!qb::Selector("A=B").eval(env));
+    BOOST_CHECK(qb::Selector("A<>B").eval(env));
+    BOOST_CHECK(!qb::Selector("A='hello kitty' OR B='Bye, bye cruel world'").eval(env));
+    BOOST_CHECK(qb::Selector("B='hello kitty' OR A='Bye, bye cruel world'").eval(env));
+    BOOST_CHECK(qb::Selector("B='hello kitty' AnD A='Bye, bye cruel world'").eval(env));
+    BOOST_CHECK(!qb::Selector("B='hello kitty' AnD B='Bye, bye cruel world'").eval(env));
+    BOOST_CHECK(qb::Selector("A is null or A='Bye, bye cruel world'").eval(env));
+    BOOST_CHECK(qb::Selector("Z is null OR A is not null and A<>'Bye, bye cruel world'").eval(env));
+    BOOST_CHECK(!qb::Selector("(Z is null OR A is not null) and A<>'Bye, bye cruel world'").eval(env));
+    BOOST_CHECK(qb::Selector("NOT C is not null OR C is null").eval(env));
+    BOOST_CHECK(qb::Selector("Not A='' or B=z").eval(env));
+    BOOST_CHECK(qb::Selector("Not A=17 or B=5.6").eval(env));
+    BOOST_CHECK(!qb::Selector("A<>17 and B=5.6e17").eval(env));
+    BOOST_CHECK(!qb::Selector("C=D").eval(env));
+    BOOST_CHECK(qb::Selector("13 is not null").eval(env));
+    BOOST_CHECK(!qb::Selector("'boo!' is null").eval(env));
+}
+
+QPID_AUTO_TEST_CASE(comparisonEval)
+{
+    TestSelectorEnv env;
+
+    BOOST_CHECK(!qb::Selector("17 > 19.0").eval(env));
+    BOOST_CHECK(!qb::Selector("'hello' > 19.0").eval(env));
+    BOOST_CHECK(!qb::Selector("'hello' < 19.0").eval(env));
+    BOOST_CHECK(!qb::Selector("'hello' = 19.0").eval(env));
+    BOOST_CHECK(!qb::Selector("'hello'>42 and 'hello'<42 and 'hello'=42 and 'hello'<>42").eval(env));
+    BOOST_CHECK(qb::Selector("20 >= 19.0 and 20 > 19").eval(env));
+    BOOST_CHECK(qb::Selector("42 <= 42.0 and 37.0 >= 37").eval(env));
 }
 
 QPID_AUTO_TEST_SUITE_END()
