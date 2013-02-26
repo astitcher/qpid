@@ -214,6 +214,13 @@ bool operator>=(const Value& v1, const Value& v2)
     return false;
 }
 
+class Expression {
+public:
+    virtual ~Expression() {}
+    virtual void repr(std::ostream&) const = 0;
+    virtual Value eval(const SelectorEnv&) const = 0;
+};
+
 // Operators
 
 class ComparisonOperator {
@@ -535,6 +542,11 @@ Not notOp;
 
 ////////////////////////////////////////////////////
 
+BoolExpression* parseOrExpression(Tokeniser&);
+BoolExpression* parseAndExpression(Tokeniser&);
+BoolExpression* parseComparisonExpression(Tokeniser&);
+Expression* parsePrimaryExpression(Tokeniser&);
+
 // Top level parser
 BoolExpression* parseTopBoolExpression(const string& exp)
 {
@@ -563,11 +575,11 @@ BoolExpression* parseOrExpression(Tokeniser& tokeniser)
 
 BoolExpression* parseAndExpression(Tokeniser& tokeniser)
 {
-    std::auto_ptr<BoolExpression> e(parseEqualityExpression(tokeniser));
+    std::auto_ptr<BoolExpression> e(parseComparisonExpression(tokeniser));
     if (!e.get()) return 0;
     while ( tokeniser.nextToken().type==T_AND ) {
         std::auto_ptr<BoolExpression> e1(e);
-        std::auto_ptr<BoolExpression> e2(parseEqualityExpression(tokeniser));
+        std::auto_ptr<BoolExpression> e2(parseComparisonExpression(tokeniser));
         if (!e2.get()) return 0;
         e.reset(new AndExpression(e1.release(), e2.release()));
     }
@@ -575,7 +587,7 @@ BoolExpression* parseAndExpression(Tokeniser& tokeniser)
     return e.release();
 }
 
-BoolExpression* parseEqualityExpression(Tokeniser& tokeniser)
+BoolExpression* parseComparisonExpression(Tokeniser& tokeniser)
 {
     const Token t = tokeniser.nextToken();
     if ( t.type==T_LPAREN ) {
@@ -584,7 +596,7 @@ BoolExpression* parseEqualityExpression(Tokeniser& tokeniser)
         if ( tokeniser.nextToken().type!=T_RPAREN ) return 0;
         return e.release();
     } else if ( t.type==T_NOT ) {
-        std::auto_ptr<BoolExpression> e(parseEqualityExpression(tokeniser));
+        std::auto_ptr<BoolExpression> e(parseComparisonExpression(tokeniser));
         if (!e.get()) return 0;
         return new UnaryBooleanExpression<BoolExpression>(&notOp, e.release());
     }

@@ -31,11 +31,10 @@ namespace qpid {
 namespace broker {
 
 class SelectorEnv;
-class Tokeniser;
 
 // The user of the Value class for strings must ensure that
 // the string has a lifetime longer than the string used and
-// is responsoble for managing its lifetime.
+// is responsible for managing its lifetime.
 class Value {
 public:
     union {
@@ -80,13 +79,6 @@ public:
     {}
 };
 
-class Expression {
-public:
-    virtual ~Expression() {}
-    virtual void repr(std::ostream&) const = 0;
-    virtual Value eval(const SelectorEnv&) const = 0;
-};
-
 class BoolExpression {
 public:
     virtual ~BoolExpression() {};
@@ -95,12 +87,6 @@ public:
 };
 
 BoolExpression* parseTopBoolExpression(const std::string& exp);
-BoolExpression* parseBoolExpression(Tokeniser&);
-BoolExpression* parseOrExpression(Tokeniser&);
-BoolExpression* parseAndExpression(Tokeniser&);
-BoolExpression* parseNotExpression(Tokeniser&);
-BoolExpression* parseEqualityExpression(Tokeniser&);
-Expression* parsePrimaryExpression(Tokeniser&);
 
 }}
 

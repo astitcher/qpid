@@ -98,30 +98,30 @@ const string NON_PERSISTENT("NON_PERSISTENT");
 const string TRUE("TRUE");
 const string FALSE("FALSE");
 
-const string* specialValue(const Message& msg, const string& id)
+const string& specialValue(const Message& msg, const string& id)
 {
     // TODO: Just use a simple if chain for now - improve this later
     if ( id=="delivery_mode" ) {
-        return msg.getEncoding().isPersistent() ? &PERSISTENT : &NON_PERSISTENT;
+        return msg.getEncoding().isPersistent() ? PERSISTENT : NON_PERSISTENT;
     } else if ( id=="redelivered" ) {
-        return msg.getDeliveryCount()>0 ? &TRUE : &FALSE;
+        return msg.getDeliveryCount()>0 ? TRUE : FALSE;
     } else if ( id=="priority" ) {
-        return &EMPTY;
+        return EMPTY;
     } else if ( id=="correlation_id" ) {
-        return &EMPTY; // Needs an indirection in getEncoding().
+        return EMPTY; // Needs an indirection in getEncoding().
     } else if ( id=="message_id" ) {
-        return &EMPTY; // Needs an indirection in getEncoding().
+        return EMPTY; // Needs an indirection in getEncoding().
     } else if ( id=="to" ) {
-        return &EMPTY; // This is good for 0-10, not sure about 1.0
+        return EMPTY; // This is good for 0-10, not sure about 1.0
     } else if ( id=="reply_to" ) {
-        return &EMPTY; // Needs an indirection in getEncoding().
+        return EMPTY; // Needs an indirection in getEncoding().
     } else if ( id=="absolute_expiry_time" ) {
-        return &EMPTY; // Needs an indirection in getEncoding().
+        return EMPTY; // Needs an indirection in getEncoding().
     } else if ( id=="creation_time" ) {
-        return &EMPTY; // Needs an indirection in getEncoding().
+        return EMPTY; // Needs an indirection in getEncoding().
     } else if ( id=="jms_type" ) {
-        return &EMPTY;
-    } else return &EMPTY;
+        return EMPTY;
+    } else return EMPTY;
 }
 
 const string& MessageSelectorEnv::value(const string& identifier) const
@@ -130,7 +130,7 @@ const string& MessageSelectorEnv::value(const string& identifier) const
 
     // Check for amqp prefix and strip it if present
     if (identifier.substr(0, 5) == "amqp.") {
-        v = specialValue(msg, identifier.substr(5));
+        v = &specialValue(msg, identifier.substr(5));
     } else {
         // Just return property as string
         //v = &msg.getPropertyAsString(identifier);
