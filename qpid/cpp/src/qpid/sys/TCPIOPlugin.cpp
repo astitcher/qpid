@@ -28,9 +28,6 @@
 #include "qpid/sys/Socket.h"
 #include "qpid/sys/SocketTransport.h"
 
-#include <boost/bind.hpp>
-#include <boost/ptr_container/ptr_vector.hpp>
-
 namespace qpid {
 namespace sys {
 
@@ -74,7 +71,7 @@ static class TCPIOPlugin : public Plugin {
             }
 
             TransportConnector::shared_ptr tc(new SocketConnector(opts.tcpNoDelay, false, opts.maxNegotiateTime, broker->getTimer(), &createSocket));
-            
+
             broker->registerTransport("tcp", ta, tc, port);
         }
     }

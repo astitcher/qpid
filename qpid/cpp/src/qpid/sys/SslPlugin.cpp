@@ -30,7 +30,6 @@
 #include "qpid/sys/ssl/SslSocket.h"
 
 #include <boost/bind.hpp>
-#include <boost/ptr_container/ptr_vector.hpp>
 
 namespace qpid {
 namespace sys {
@@ -64,15 +63,15 @@ namespace {
     Socket* createServerSSLSocket(const SslServerOptions& options) {
         return new SslSocket(options.certName, options.clientAuth);
     }
-    
+
     Socket* createServerSSLMuxSocket(const SslServerOptions& options) {
         return new SslMuxSocket(options.certName, options.clientAuth);
     }
-    
+
     Socket* createClientSSLSocket() {
         return new SslSocket();
     }
-    
+
 }
 
 // Static instance to initialise plugin
