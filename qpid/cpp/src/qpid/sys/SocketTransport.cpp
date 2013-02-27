@@ -108,22 +108,24 @@ namespace {
     }
 }
 
-SocketAcceptor::SocketAcceptor(bool tcpNoDelay, bool nodict, uint32_t maxNegotiateTime, Timer& timer0, const SocketFactory& factory0) :
+SocketAcceptor::SocketAcceptor(bool tcpNoDelay, bool nodict, uint32_t maxNegotiateTime, Timer& timer0) :
     timer(timer0),
-    factory(factory0),
     options(tcpNoDelay, nodict, maxNegotiateTime),
     established(boost::bind(&establishedIncoming, _1, options, &timer, _2, _3))
 {}
 
-SocketAcceptor::SocketAcceptor(bool tcpNoDelay, bool nodict, uint32_t maxNegotiateTime, Timer& timer0,
-                               const SocketFactory& factory0, const EstablishedCallback& established0) :
+SocketAcceptor::SocketAcceptor(bool tcpNoDelay, bool nodict, uint32_t maxNegotiateTime, Timer& timer0, const EstablishedCallback& established0) :
     timer(timer0),
-    factory(factory0),
     options(tcpNoDelay, nodict, maxNegotiateTime),
     established(established0)
 {}
 
-uint16_t SocketAcceptor::listen(const std::vector<std::string>& interfaces, const std::string& port, int backlog)
+void SocketAcceptor::addListener(Socket* socket)
+{
+    listeners.push_back(socket);
+}
+
+uint16_t SocketAcceptor::listen(const std::vector<std::string>& interfaces, const std::string& port, int backlog, const SocketFactory& factory)
 {
     std::vector<std::string> addresses = expandInterfaces(interfaces);
     if (addresses.empty()) {
@@ -142,7 +144,7 @@ uint16_t SocketAcceptor::listen(const std::vector<std::string>& interfaces, cons
         Socket* s = factory();
         uint16_t lport = s->listen(sa, backlog);
         QPID_LOG(debug, "Listened to: " << lport);
-        listeners.push_back(s);
+        addListener(s);
 
         listeningPort = lport;
         
@@ -154,7 +156,7 @@ uint16_t SocketAcceptor::listen(const std::vector<std::string>& interfaces, cons
             Socket* s = factory();
             uint16_t lport = s->listen(sa, backlog);
             QPID_LOG(debug, "Listened to: " << lport);
-            listeners.push_back(s);
+            addListener(s);
         }
     }
     return listeningPort;

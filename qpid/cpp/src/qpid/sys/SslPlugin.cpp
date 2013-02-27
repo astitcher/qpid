@@ -118,12 +118,11 @@ static struct SslPlugin : public Plugin {
                     const broker::Broker::Options& opts = broker->getOptions();
                     TransportAcceptor::shared_ptr ta;
                     SocketAcceptor* sa =
-                        new SocketAcceptor(opts.tcpNoDelay, options.nodict, opts.maxNegotiateTime, broker->getTimer(),
-                                           options.multiplex ?
-                                            boost::bind(&createServerSSLMuxSocket, options) :
-                                            boost::bind(&createServerSSLSocket, options)
-                    );
-                    uint16_t port = sa->listen(opts.listenInterfaces, boost::lexical_cast<std::string>(options.port), opts.connectionBacklog);
+                        new SocketAcceptor(opts.tcpNoDelay, options.nodict, opts.maxNegotiateTime, broker->getTimer());
+                    uint16_t port = sa->listen(opts.listenInterfaces, boost::lexical_cast<std::string>(options.port), opts.connectionBacklog,
+                                               options.multiplex ?
+                                                 boost::bind(&createServerSSLMuxSocket, options) :
+                                                 boost::bind(&createServerSSLSocket, options));
                     if ( port!=0 ) {
                         ta.reset(sa);
                         QPID_LOG(notice, "Listening for " <<

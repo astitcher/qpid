@@ -123,8 +123,10 @@ static struct SslPlugin : public Plugin {
             try {
                 const broker::Broker::Options& opts = broker->getOptions();
                 boost::shared_ptr<SslProtocolFactory> protocol(new SslProtocolFactory(opts, options, broker->getTimer()));
-                uint16_t port = protocol->listen(opts.listenInterfaces, boost::lexical_cast<std::string>(opts.port), opts.connectionBacklog);
-
+                uint16_t port =
+                    protocol->listen(opts.listenInterfaces,
+                                     boost::lexical_cast<std::string>(opts.port), opts.connectionBacklog,
+                                     &createSocket);
                 QPID_LOG(notice, "Listening for SSL connections on TCP port " << port);
                 broker->registerTransport("ssl", protocol, protocol, port);
             } catch (const std::exception& e) {
@@ -136,7 +138,7 @@ static struct SslPlugin : public Plugin {
 
 SslProtocolFactory::SslProtocolFactory(const qpid::broker::Broker::Options& opts, const SslServerOptions& options, Timer& timer)
     : SocketAcceptor(opts.tcpNoDelay, false, opts.maxNegotiateTime, timer,
-                     &createSocket, boost::bind(&SslProtocolFactory::establishedIncoming, this, _1, _2, _3)),
+                     boost::bind(&SslProtocolFactory::establishedIncoming, this, _1, _2, _3)),
       brokerTimer(timer),
       maxNegotiateTime(opts.maxNegotiateTime),
       tcpNoDelay(opts.tcpNoDelay),
