@@ -290,7 +290,7 @@ public:
     }
 
     Value eval(const SelectorEnv& env) const {
-        return env.present(identifier) ? Value(env.value(identifier)) : Value();
+        return env.value(identifier);
     }
 };
 

@@ -21,14 +21,17 @@
 
 #include "qpid/broker/SelectorToken.h"
 #include "qpid/broker/Selector.h"
+#include "qpid/broker/SelectorValue.h"
 
 #include "unit_test.h"
 
 #include <string>
 #include <map>
+#include <boost/ptr_container/ptr_vector.hpp>
 
 using std::string;
 using std::map;
+using std::vector;
 
 namespace qb = qpid::broker;
 
@@ -182,24 +185,36 @@ QPID_AUTO_TEST_CASE(parseStringFail)
 }
 
 class TestSelectorEnv : public qpid::broker::SelectorEnv {
-    map<string, string> values;
-    static const string EMPTY;
+    map<string, qb::Value> values;
+    boost::ptr_vector<string> strings;
+    static const qb::Value EMPTY;
 
-    bool present(const std::string& v) const {
+    bool present(const string& v) const {
         return values.find(v)!=values.end();
     }
 
-    const std::string& value(const std::string& v) const {
-        return present(v) ? values.at(v) : EMPTY;
+    const qb::Value& value(const string& v) const {
+        const qb::Value& r = present(v) ? values.at(v) : EMPTY;
+        return r;
     }
 
 public:
-    void set(const string& id, const string& value) {
-        values[id] = value;
+    void set(const string& id, const char* value) {
+        strings.push_back(new string(value));
+        values[id] = strings[strings.size()-1];
+    }
+
+    void set(const string& id, const qb::Value& value) {
+        if (value.type==qb::Value::T_STRING) {
+            strings.push_back(new string(*value.s));
+            values[id] = strings[strings.size()-1];
+        } else {
+            values[id] = value;
+        }
     }
 };
 
-const string TestSelectorEnv::EMPTY;
+const qb::Value TestSelectorEnv::EMPTY;
 
 QPID_AUTO_TEST_CASE(parseString)
 {
@@ -236,6 +251,8 @@ QPID_AUTO_TEST_CASE(simpleEval)
     BOOST_CHECK(!qb::Selector("A <> C").eval(env));
     BOOST_CHECK(!qb::Selector("C is not null").eval(env));
     BOOST_CHECK(qb::Selector("C is null").eval(env));
+    BOOST_CHECK(qb::Selector("A='Bye, bye cruel world'").eval(env));
+    BOOST_CHECK(!qb::Selector("A<>'Bye, bye cruel world'").eval(env));
     BOOST_CHECK(!qb::Selector("A='hello kitty'").eval(env));
     BOOST_CHECK(qb::Selector("A<>'hello kitty'").eval(env));
     BOOST_CHECK(!qb::Selector("A=B").eval(env));
@@ -254,6 +271,19 @@ QPID_AUTO_TEST_CASE(simpleEval)
     BOOST_CHECK(!qb::Selector("C=D").eval(env));
     BOOST_CHECK(qb::Selector("13 is not null").eval(env));
     BOOST_CHECK(!qb::Selector("'boo!' is null").eval(env));
+}
+
+QPID_AUTO_TEST_CASE(numericEval)
+{
+    TestSelectorEnv env;
+    env.set("A", 42.0);
+    env.set("B", 39l);
+
+    BOOST_CHECK(qb::Selector("A>B").eval(env));
+    BOOST_CHECK(qb::Selector("A=42").eval(env));
+    BOOST_CHECK(qb::Selector("B=39.0").eval(env));
+    BOOST_CHECK(qb::Selector("Not A=17 or B=5.6").eval(env));
+    BOOST_CHECK(!qb::Selector("A<>17 and B=5.6e17").eval(env));
 }
 
 QPID_AUTO_TEST_CASE(comparisonEval)
