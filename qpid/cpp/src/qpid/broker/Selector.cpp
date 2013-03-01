@@ -38,7 +38,7 @@ namespace broker {
 using std::string;
 
 Selector::Selector(const string& e) :
-    parse(parseTopBoolExpression(e)),
+    parse(TopExpression::parse(e)),
     expression(e)
 {
     bool debugOut;

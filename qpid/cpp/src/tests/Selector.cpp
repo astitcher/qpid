@@ -269,6 +269,20 @@ QPID_AUTO_TEST_CASE(comparisonEval)
     BOOST_CHECK(qb::Selector("42 <= 42.0 and 37.0 >= 37").eval(env));
 }
 
+QPID_AUTO_TEST_CASE(NullEval)
+{
+    TestSelectorEnv env;
+
+    BOOST_CHECK(qb::Selector("P > 19.0 or (P is null)").eval(env));
+    BOOST_CHECK(qb::Selector("P is null or P=''").eval(env));
+    BOOST_CHECK(!qb::Selector("P=Q").eval(env));
+    BOOST_CHECK(!qb::Selector("not P=Q").eval(env));
+    BOOST_CHECK(!qb::Selector("not P=Q and not P=Q").eval(env));
+    BOOST_CHECK(!qb::Selector("P=Q or not P=Q").eval(env));
+    BOOST_CHECK(!qb::Selector("P > 19.0 or P <= 19.0").eval(env));
+    BOOST_CHECK(qb::Selector("P > 19.0 or 17 <= 19.0").eval(env));
+}
+
 QPID_AUTO_TEST_SUITE_END()
 
 }}

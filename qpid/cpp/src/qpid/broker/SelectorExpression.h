@@ -22,8 +22,6 @@
  *
  */
 
-#include "qpid/sys/IntegerTypes.h"
-
 #include <iosfwd>
 #include <string>
 
@@ -32,61 +30,14 @@ namespace broker {
 
 class SelectorEnv;
 
-// The user of the Value class for strings must ensure that
-// the string has a lifetime longer than the string used and
-// is responsible for managing its lifetime.
-class Value {
+class TopExpression {
 public:
-    union {
-        bool         b;
-        uint64_t     i;
-        double       x;
-        const std::string* s;
-    };
-    enum {
-        T_UNKNOWN,
-        T_BOOL,
-        T_STRING,
-        T_EXACT,
-        T_INEXACT
-    } type;
-
-    // Default copy contructor
-    // Default assignment operator
-    // Default destructor
-    Value() :
-        type(T_UNKNOWN)
-    {}
-
-    Value(const std::string& s0) :
-        s(&s0),
-        type(T_STRING)
-    {}
-
-    Value(const uint64_t i0) :
-        i(i0),
-        type(T_EXACT)
-    {}
-
-    Value(const double x0) :
-        x(x0),
-        type(T_INEXACT)
-    {}
-
-    Value(bool b0) :
-        b(b0),
-        type(T_BOOL)
-    {}
-};
-
-class BoolExpression {
-public:
-    virtual ~BoolExpression() {};
+    virtual ~TopExpression() {};
     virtual void repr(std::ostream&) const = 0;
     virtual bool eval(const SelectorEnv&) const = 0;
-};
 
-BoolExpression* parseTopBoolExpression(const std::string& exp);
+    static TopExpression* parse(const std::string& exp);
+};
 
 }}
 

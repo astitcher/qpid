@@ -23,6 +23,7 @@
 
 #include "qpid/broker/Selector.h"
 #include "qpid/broker/SelectorToken.h"
+#include "qpid/broker/SelectorValue.h"
 #include "qpid/sys/IntegerTypes.h"
 
 #include <string>
@@ -53,7 +54,6 @@
  *
  * Literal ::= LiteralBool | LiteralString | LiteralApproxNumeric | LiteralExactNumeric
  *
- * // Currently only simple string comparison expressions + IS NULL or IS NOT NULL
  * EqOps ::= "=" | "<>"
  *
  * ComparisonOps ::= EqOps | ">" | ">=" | "<" | "<="
@@ -65,7 +65,7 @@
  * AndExpression :: = EqualityExpression ( "AND" EqualityExpression  )*
  *
  * ComparisonExpression ::= PrimaryExpression "IS" "NULL" |
- *                        PrimaryExpression "IS "NOT" "NULL" |
+ *                        PrimaryExpression "IS" "NOT" "NULL" |
  *                        PrimaryExpression ComparisonOpsOps PrimaryExpression |
  *                        "NOT" ComparisonExpression |
  *                        "(" OrExpression ")"
@@ -81,139 +81,6 @@ namespace broker {
 using std::string;
 using std::ostream;
 
-namespace {
-// Operations on values
-
-bool unknown(const Value& v) {
-    return v.type == Value::T_UNKNOWN;
-}
-
-bool numeric(const Value& v) {
-    return v.type == Value::T_EXACT || v.type == Value::T_INEXACT;
-}
-
-}
-
-class NumericPairBase {
-public:
-    virtual Value add() = 0;
-    virtual Value sub() = 0;
-    virtual Value mul() = 0;
-    virtual Value div() = 0;
-
-    virtual bool eq() = 0;
-    virtual bool ne() = 0;
-    virtual bool ls() = 0;
-    virtual bool gr() = 0;
-    virtual bool le() = 0;
-    virtual bool ge() = 0;
-};
-
-template <typename T>
-class NumericPair : public NumericPairBase {
-    const T n1;
-    const T n2;
-
-    Value add() { return n1+n2; }
-    Value sub() { return n1-n2; }
-    Value mul() { return n1*n2; }
-    Value div() { return n1/n2; }
-
-    bool eq() { return n1==n2; }
-    bool ne() { return n1!=n2; }
-    bool ls() { return n1<n2; }
-    bool gr() { return n1>n2; }
-    bool le() { return n1<=n2; }
-    bool ge() { return n1>=n2; }
-
-public:
-    NumericPair(T x, T y) :
-        n1(x),
-        n2(y)
-    {}
-};
-
-NumericPairBase* promoteNumeric(const Value& v1, const Value& v2)
-{
-    if (!numeric(v1) || !numeric(v2)) return 0;
-
-    if (v1.type != v2.type) {
-        switch (v1.type) {
-        case Value::T_INEXACT: return new NumericPair<double>(v1.x, v2.i);
-        case Value::T_EXACT: return new NumericPair<double>(v1.i, v2.x);
-        default:
-            assert(false);
-        }
-    } else {
-        switch (v1.type) {
-        case Value::T_INEXACT: return new NumericPair<double>(v1.x, v2.x);
-        case Value::T_EXACT: return new NumericPair<uint64_t>(v1.i, v2.i);
-        default:
-            assert(false);
-        }
-    }
-}
-
-bool operator==(const Value& v1, const Value& v2)
-{
-    boost::scoped_ptr<NumericPairBase> nbp(promoteNumeric(v1, v2));
-    if (nbp) return nbp->eq();
-
-    if (v1.type != v2.type) return false;
-    switch (v1.type) {
-    case Value::T_BOOL: return v1.b == v2.b;
-    case Value::T_STRING: return *v1.s == *v2.s;
-    default: // Cannot ever get here
-        return false;
-    }
-}
-
-bool operator!=(const Value& v1, const Value& v2)
-{
-    boost::scoped_ptr<NumericPairBase> nbp(promoteNumeric(v1, v2));
-    if (nbp) return nbp->ne();
-
-    if (v1.type != v2.type) return false;
-    switch (v1.type) {
-    case Value::T_BOOL: return v1.b != v2.b;
-    case Value::T_STRING: return *v1.s != *v2.s;
-    default: // Cannot ever get here
-        return false;
-    }
-}
-
-bool operator<(const Value& v1, const Value& v2)
-{
-    boost::scoped_ptr<NumericPairBase> nbp(promoteNumeric(v1, v2));
-    if (nbp) return nbp->ls();
-
-    return false;
-}
-
-bool operator>(const Value& v1, const Value& v2)
-{
-    boost::scoped_ptr<NumericPairBase> nbp(promoteNumeric(v1, v2));
-    if (nbp) return nbp->gr();
-
-    return false;
-}
-
-bool operator<=(const Value& v1, const Value& v2)
-{
-    boost::scoped_ptr<NumericPairBase> nbp(promoteNumeric(v1, v2));
-    if (nbp) return nbp->le();
-
-    return false;
-}
-
-bool operator>=(const Value& v1, const Value& v2)
-{
-    boost::scoped_ptr<NumericPairBase> nbp(promoteNumeric(v1, v2));
-    if (nbp) return nbp->ge();
-
-    return false;
-}
-
 class Expression {
 public:
     virtual ~Expression() {}
@@ -221,19 +88,30 @@ public:
     virtual Value eval(const SelectorEnv&) const = 0;
 };
 
+class BoolExpression : public Expression {
+public:
+    virtual ~BoolExpression() {}
+    virtual void repr(std::ostream&) const = 0;
+    virtual BoolOrNone eval_bool(const SelectorEnv&) const = 0;
+
+    Value eval(const SelectorEnv& env) const {
+        return eval_bool(env);
+    }
+};
+
 // Operators
 
 class ComparisonOperator {
 public:
     virtual void repr(ostream&) const = 0;
-    virtual bool eval(Expression&, Expression&, const SelectorEnv&) const = 0;
+    virtual BoolOrNone eval(Expression&, Expression&, const SelectorEnv&) const = 0;
 };
 
 template <typename T>
 class UnaryBooleanOperator {
 public:
     virtual void repr(ostream&) const = 0;
-    virtual bool eval(T&, const SelectorEnv&) const = 0;
+    virtual BoolOrNone eval(T&, const SelectorEnv&) const = 0;
 };
 
 ////////////////////////////////////////////////////
@@ -295,7 +173,7 @@ public:
         os << "(" << *e1 << *op << *e2 << ")";
     }
 
-    bool eval(const SelectorEnv& env) const {
+    BoolOrNone eval_bool(const SelectorEnv& env) const {
         return op->eval(*e1, *e2, env);
     }
 };
@@ -314,9 +192,19 @@ public:
         os << "(" << *e1 << " OR " << *e2 << ")";
     }
 
-    // We can use the regular C++ short-circuiting operator||
-    bool eval(const SelectorEnv& env) const {
-        return e1->eval(env) || e2->eval(env);
+    BoolOrNone eval_bool(const SelectorEnv& env) const {
+        BoolOrNone bn1(e1->eval_bool(env));
+        if (bn1==BN_TRUE) {
+            return BN_TRUE;
+        } else {
+            BoolOrNone bn2(e2->eval_bool(env));
+            if (bn2==BN_TRUE) {
+                return BN_TRUE;
+            } else {
+                if (bn1==BN_FALSE && bn2==BN_FALSE) return BN_FALSE;
+                else return BN_UNKNOWN;
+            }
+        }
     }
 };
 
@@ -334,9 +222,19 @@ public:
         os << "(" << *e1 << " AND " << *e2 << ")";
     }
 
-    // We can use the regular C++ short-circuiting operator&&
-    bool eval(const SelectorEnv& env) const {
-        return e1->eval(env) && e2->eval(env);
+    BoolOrNone eval_bool(const SelectorEnv& env) const {
+        BoolOrNone bn1(e1->eval_bool(env));
+        if (bn1==BN_FALSE) {
+            return BN_FALSE;
+        } else {
+            BoolOrNone bn2(e2->eval_bool(env));
+            if (bn2==BN_FALSE) {
+                return BN_FALSE;
+            } else {
+                if (bn1==BN_TRUE && bn2==BN_TRUE) return BN_TRUE;
+                else return BN_UNKNOWN;
+            }
+        }
     }
 };
 
@@ -355,7 +253,7 @@ public:
         os << *op << "(" << *e1 << ")";
     }
 
-    virtual bool eval(const SelectorEnv& env) const {
+    virtual BoolOrNone eval_bool(const SelectorEnv& env) const {
         return op->eval(*e1, env);
     }
 };
@@ -420,15 +318,15 @@ public:
 
 typedef bool BoolOp(const Value&, const Value&);
 
-bool booleval(BoolOp* op, Expression& e1, Expression& e2, const SelectorEnv& env) {
+BoolOrNone booleval(BoolOp* op, Expression& e1, Expression& e2, const SelectorEnv& env) {
     const Value v1(e1.eval(env));
     if (!unknown(v1)) {
         const Value v2(e2.eval(env));
         if (!unknown(v2)) {
-            return op(v1, v2);
+            return BoolOrNone(op(v1, v2));
         }
     }
-    return false;
+    return BN_UNKNOWN;
 }
 
 // "="
@@ -437,7 +335,7 @@ class Eq : public ComparisonOperator {
         os << "=";
     }
 
-    bool eval(Expression& e1, Expression& e2, const SelectorEnv& env) const {
+    BoolOrNone eval(Expression& e1, Expression& e2, const SelectorEnv& env) const {
         return booleval(&operator==, e1, e2, env);
     }
 };
@@ -448,7 +346,7 @@ class Neq : public ComparisonOperator {
         os << "<>";
     }
 
-    bool eval(Expression& e1, Expression& e2, const SelectorEnv& env) const {
+    BoolOrNone eval(Expression& e1, Expression& e2, const SelectorEnv& env) const {
         return booleval(&operator!=, e1, e2, env);
     }
 };
@@ -459,7 +357,7 @@ class Ls : public ComparisonOperator {
         os << "<";
     }
 
-    bool eval(Expression& e1, Expression& e2, const SelectorEnv& env) const {
+    BoolOrNone eval(Expression& e1, Expression& e2, const SelectorEnv& env) const {
         return booleval(&operator<, e1, e2, env);
     }
 };
@@ -470,7 +368,7 @@ class Gr : public ComparisonOperator {
         os << ">";
     }
 
-    bool eval(Expression& e1, Expression& e2, const SelectorEnv& env) const {
+    BoolOrNone eval(Expression& e1, Expression& e2, const SelectorEnv& env) const {
         return booleval(&operator>, e1, e2, env);
     }
 };
@@ -481,7 +379,7 @@ class Lseq : public ComparisonOperator {
         os << "<=";
     }
 
-    bool eval(Expression& e1, Expression& e2, const SelectorEnv& env) const {
+    BoolOrNone eval(Expression& e1, Expression& e2, const SelectorEnv& env) const {
         return booleval(&operator<=, e1, e2, env);
     }
 };
@@ -492,7 +390,7 @@ class Greq : public ComparisonOperator {
         os << ">=";
     }
 
-    bool eval(Expression& e1, Expression& e2, const SelectorEnv& env) const {
+    BoolOrNone eval(Expression& e1, Expression& e2, const SelectorEnv& env) const {
         return booleval(&operator>=, e1, e2, env);
     }
 };
@@ -503,8 +401,8 @@ class IsNull : public UnaryBooleanOperator<Expression> {
         os << "IsNull";
     }
 
-    bool eval(Expression& e, const SelectorEnv& env) const {
-        return unknown(e.eval(env));
+    BoolOrNone eval(Expression& e, const SelectorEnv& env) const {
+        return BoolOrNone(unknown(e.eval(env)));
     }
 };
 
@@ -514,8 +412,8 @@ class IsNonNull : public UnaryBooleanOperator<Expression> {
         os << "IsNonNull";
     }
 
-    bool eval(Expression& e, const SelectorEnv& env) const {
-        return !unknown(e.eval(env));
+    BoolOrNone eval(Expression& e, const SelectorEnv& env) const {
+        return BoolOrNone(!unknown(e.eval(env)));
     }
 };
 
@@ -525,8 +423,10 @@ class Not : public UnaryBooleanOperator<BoolExpression> {
         os << "NOT";
     }
 
-    bool eval(BoolExpression& e, const SelectorEnv& env) const {
-        return !e.eval(env);
+    BoolOrNone eval(BoolExpression& e, const SelectorEnv& env) const {
+        BoolOrNone bn = e.eval_bool(env);
+        if (bn==BN_UNKNOWN) return bn;
+        else return BoolOrNone(!bn);
     }
 };
 
@@ -548,7 +448,26 @@ BoolExpression* parseComparisonExpression(Tokeniser&);
 Expression* parsePrimaryExpression(Tokeniser&);
 
 // Top level parser
-BoolExpression* parseTopBoolExpression(const string& exp)
+class TopBoolExpression : public TopExpression {
+    boost::scoped_ptr<BoolExpression> expression;
+
+    void repr(ostream& os) const {
+        expression->repr(os);
+    }
+
+    bool eval(const SelectorEnv& env) const {
+        BoolOrNone bn = expression->eval_bool(env);
+        if (bn==BN_TRUE) return true;
+        else return false;
+    }
+
+public:
+    TopBoolExpression(BoolExpression* be) :
+        expression(be)
+    {}
+};
+
+TopExpression* TopExpression::parse(const string& exp)
 {
     string::const_iterator s = exp.begin();
     string::const_iterator e = exp.end();
@@ -556,7 +475,7 @@ BoolExpression* parseTopBoolExpression(const string& exp)
     std::auto_ptr<BoolExpression> b(parseOrExpression(tokeniser));
     if (!b.get()) throw std::range_error("Illegal selector: couldn't parse");
     if (tokeniser.nextToken().type != T_EOS) throw std::range_error("Illegal selector: too much input");
-    return b.release();
+    return new TopBoolExpression(b.release());
 }
 
 BoolExpression* parseOrExpression(Tokeniser& tokeniser)
