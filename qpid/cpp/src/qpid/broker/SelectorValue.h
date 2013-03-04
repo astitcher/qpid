@@ -24,6 +24,7 @@
 
 #include "qpid/sys/IntegerTypes.h"
 
+#include <iosfwd>
 #include <string>
 
 namespace qpid {
@@ -94,6 +95,8 @@ inline bool unknown(const Value& v) {
 inline bool numeric(const Value& v) {
     return v.type == Value::T_EXACT || v.type == Value::T_INEXACT;
 }
+
+std::ostream& operator<<(std::ostream& os, const Value& v);
 
 bool operator==(const Value&, const Value&);
 bool operator!=(const Value&, const Value&);

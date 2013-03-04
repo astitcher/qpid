@@ -21,10 +21,25 @@
 
 #include "qpid/broker/SelectorValue.h"
 
+#include <ostream>
 #include <boost/scoped_ptr.hpp>
+
+using std::ostream;
 
 namespace qpid {
 namespace broker {
+
+ostream& operator<<(ostream& os, const Value& v)
+{
+    switch (v.type) {
+    case Value::T_UNKNOWN: os << "UNKNOWN"; break;
+    case Value::T_BOOL: os << "BOOL:" << std::boolalpha << v.b; break;
+    case Value::T_EXACT: os << "EXACT:" << v.i; break;
+    case Value::T_INEXACT: os << "APPROX:" << v.x; break;
+    case Value::T_STRING: os << "STRING:'" << *v.s << "'"; break;
+    };
+    return os;
+}
 
 class NumericPairBase {
 public:

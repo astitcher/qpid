@@ -118,25 +118,7 @@ public:
 
 // Convenience outputters
 
-ostream& operator<<(ostream& os, const Value& v)
-{
-    switch (v.type) {
-    case Value::T_UNKNOWN: os << "UNKNOWN"; break;
-    case Value::T_BOOL: os << "BOOL[" << std::boolalpha << v.b << "]"; break;
-    case Value::T_EXACT: os << "EXACT[" << v.i << "]"; break;
-    case Value::T_INEXACT: os << "APPROX[" << v.x << "]"; break;
-    case Value::T_STRING: os << "'" << *v.s << "'"; break;
-    };
-    return os;
-}
-
 ostream& operator<<(ostream& os, const Expression& e)
-{
-    e.repr(os);
-    return os;
-}
-
-ostream& operator<<(ostream& os, const BoolExpression& e)
 {
     e.repr(os);
     return os;
