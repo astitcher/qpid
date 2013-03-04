@@ -42,9 +42,9 @@ enum BoolOrNone {
 class Value {
 public:
     union {
-        bool         b;
-        uint64_t     i;
-        double       x;
+        bool               b;
+        int64_t            i;
+        double             x;
         const std::string* s;
     };
     enum {
@@ -67,7 +67,7 @@ public:
         type(T_STRING)
     {}
 
-    Value(const uint64_t i0) :
+    Value(const int64_t i0) :
         i(i0),
         type(T_EXACT)
     {}

@@ -552,7 +552,7 @@ Expression* parsePrimaryExpression(Tokeniser& tokeniser)
         case T_TRUE:
             return new Literal(true);
         case T_NUMERIC_EXACT:
-            return new Literal(boost::lexical_cast<uint64_t>(t.val));
+            return new Literal(boost::lexical_cast<int64_t>(t.val));
         case T_NUMERIC_APPROX:
             return new Literal(boost::lexical_cast<double>(t.val));
         default:

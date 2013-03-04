@@ -94,7 +94,7 @@ NumericPairBase* promoteNumeric(const Value& v1, const Value& v2)
     } else {
         switch (v1.type) {
         case Value::T_INEXACT: return new NumericPair<double>(v1.x, v2.x);
-        case Value::T_EXACT: return new NumericPair<uint64_t>(v1.i, v2.i);
+        case Value::T_EXACT: return new NumericPair<int64_t>(v1.i, v2.i);
         default:
             assert(false);
         }
