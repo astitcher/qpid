@@ -65,10 +65,12 @@
  * AndExpression :: = EqualityExpression ( "AND" EqualityExpression  )*
  *
  * ComparisonExpression ::= PrimaryExpression "IS" "NULL" |
- *                        PrimaryExpression "IS" "NOT" "NULL" |
- *                        PrimaryExpression ComparisonOpsOps PrimaryExpression |
- *                        "NOT" ComparisonExpression |
- *                        "(" OrExpression ")"
+ *                          PrimaryExpression "IS" "NOT" "NULL" |
+ *                          PrimaryExpression "LIKE" LiteralString [ "ESCAPE" LiteralString ]
+ *                          PrimaryExpression "NOT" "LIKE" LiteralString [ "ESCAPE" LiteralString ]
+ *                          PrimaryExpression ComparisonOpsOps PrimaryExpression |
+ *                          "NOT" ComparisonExpression |
+ *                          "(" OrExpression ")"
  *
  * PrimaryExpression :: = Identifier |
  *                        Literal
@@ -239,6 +241,27 @@ public:
 
     virtual BoolOrNone eval_bool(const SelectorEnv& env) const {
         return op->eval(*e1, env);
+    }
+};
+
+class LikeExpression : public BoolExpression {
+    boost::scoped_ptr<Expression> e;
+    const string like;
+    const string escape;
+
+public:
+    LikeExpression(Expression* e_, const string& like_, const string& escape_="") :
+        e(e_),
+        like(like_),
+        escape(escape_)
+    {}
+
+    void repr(ostream& os) const {
+        os << *e << " LIKE '" << like << "' ESCAPE '" << escape <<"'";
+    }
+
+    virtual BoolOrNone eval_bool(const SelectorEnv& /*env*/) const {
+        return BN_UNKNOWN;
     }
 };
 
@@ -490,6 +513,32 @@ BoolExpression* parseAndExpression(Tokeniser& tokeniser)
     return e.release();
 }
 
+BoolExpression* parseSpecialComparisons(Tokeniser& tokeniser, Expression* e1) {
+    switch (tokeniser.nextToken().type) {
+        case T_LIKE: {
+            const Token& t = tokeniser.nextToken();
+            if ( t.type==T_STRING ) {
+                // Check for "ESCAPE"
+                if ( tokeniser.nextToken().type==T_ESCAPE ) {
+                    const Token e = tokeniser.nextToken();
+                    if ( e.type==T_STRING ) {
+                        return new LikeExpression(e1, t.val, e.val);
+                    } else {
+                        return 0;
+                    }
+                } else {
+                    tokeniser.returnTokens();
+                    return new LikeExpression(e1, t.val);
+                }
+            } else {
+                return 0;
+            }
+        }
+        default:
+            return 0;
+    }
+}
+
 BoolExpression* parseComparisonExpression(Tokeniser& tokeniser)
 {
     const Token t = tokeniser.nextToken();
@@ -508,19 +557,32 @@ BoolExpression* parseComparisonExpression(Tokeniser& tokeniser)
     std::auto_ptr<Expression> e1(parsePrimaryExpression(tokeniser));
     if (!e1.get()) return 0;
 
-    // Check for "IS NULL" and "IS NOT NULL"
-    if ( tokeniser.nextToken().type==T_IS ) {
-        // The rest must be T_NULL or T_NOT, T_NULL
-        switch (tokeniser.nextToken().type) {
-            case T_NULL:
-                return new UnaryBooleanExpression<Expression>(&isNullOp, e1.release());
-            case T_NOT:
-                if ( tokeniser.nextToken().type == T_NULL)
-                    return new UnaryBooleanExpression<Expression>(&isNonNullOp, e1.release());
-            default:
-                return 0;
+    switch (tokeniser.nextToken().type) {
+        // Check for "IS NULL" and "IS NOT NULL"
+        case T_IS:
+            // The rest must be T_NULL or T_NOT, T_NULL
+            switch (tokeniser.nextToken().type) {
+                case T_NULL:
+                    return new UnaryBooleanExpression<Expression>(&isNullOp, e1.release());
+                case T_NOT:
+                    if ( tokeniser.nextToken().type == T_NULL)
+                        return new UnaryBooleanExpression<Expression>(&isNonNullOp, e1.release());
+                default:
+                    return 0;
+            }
+        case T_NOT: {
+            std::auto_ptr<BoolExpression> e(parseSpecialComparisons(tokeniser, e1.release()));
+            if (!e.get()) return 0;
+            return new UnaryBooleanExpression<BoolExpression>(&notOp, e.release());
         }
+        default:
+            break;
     }
+    tokeniser.returnTokens();
+
+    // Check for "LIKE" etc.
+    std::auto_ptr<BoolExpression> e(parseSpecialComparisons(tokeniser, e1.get()));
+    if (e.get()) {e1.release(); return e.release();}
     tokeniser.returnTokens();
 
     const Token op = tokeniser.nextToken();

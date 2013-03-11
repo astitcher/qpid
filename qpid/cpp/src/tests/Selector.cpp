@@ -233,6 +233,9 @@ QPID_AUTO_TEST_CASE(parseString)
     BOOST_CHECK_NO_THROW(qb::Selector e("Not A='' or B=z"));
     BOOST_CHECK_NO_THROW(qb::Selector e("Not A=17 or B=5.6"));
     BOOST_CHECK_NO_THROW(qb::Selector e("A<>17 and B=5.6e17"));
+    BOOST_CHECK_NO_THROW(qb::Selector e("A LIKE 'excep%ional'"));
+    BOOST_CHECK_NO_THROW(qb::Selector e("B NOT LIKE 'excep%ional'"));
+    BOOST_CHECK_NO_THROW(qb::Selector e("A LIKE 'excep%ional' EScape '\'"));
 }
 
 QPID_AUTO_TEST_CASE(simpleEval)
