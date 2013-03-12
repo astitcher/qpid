@@ -301,8 +301,8 @@ public:
         e(e_),
         regex(toRegex(like, escape))
     {
-        // TODO errors
-        ::regcomp(&regexBuffer, regex.c_str(), REG_NOSUB);
+        int rc = ::regcomp(&regexBuffer, regex.c_str(), REG_NOSUB);
+        if (rc != 0) throw std::logic_error("Like: Regular expression compilation error");
     }
 
     ~LikeExpression() {
@@ -316,7 +316,6 @@ public:
     BoolOrNone eval_bool(const SelectorEnv& env) const {
         Value v(e->eval(env));
         if ( v.type!=Value::T_STRING ) return BN_UNKNOWN;
-        // TODO errors
         return BoolOrNone(::regexec(&regexBuffer, v.s->c_str(), 0, 0, 0)==0);
     }
 };
