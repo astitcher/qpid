@@ -33,6 +33,9 @@
 #include <boost/scoped_ptr.hpp>
 #include <boost/lexical_cast.hpp>
 
+// Pull in Posix regex
+#include <regex.h>
+
 /*
  * Syntax for JMS style selector expressions (informal):
  *
@@ -239,29 +242,82 @@ public:
         os << *op << "(" << *e1 << ")";
     }
 
-    virtual BoolOrNone eval_bool(const SelectorEnv& env) const {
+    BoolOrNone eval_bool(const SelectorEnv& env) const {
         return op->eval(*e1, env);
     }
 };
 
 class LikeExpression : public BoolExpression {
     boost::scoped_ptr<Expression> e;
-    const string like;
-    const string escape;
+    string regex;
+    ::regex_t regexBuffer;
 
-public:
-    LikeExpression(Expression* e_, const string& like_, const string& escape_="") :
-        e(e_),
-        like(like_),
-        escape(escape_)
-    {}
-
-    void repr(ostream& os) const {
-        os << *e << " LIKE '" << like << "' ESCAPE '" << escape <<"'";
+    static string toRegex(const string& s, const string& escape) {
+        string regex("^");
+        if (escape.size()>1) throw std::range_error("Illegal escape char");
+        char e = 0;
+        if (escape.size()==1) {
+            e = escape[0];
+        }
+        // Translate % -> .*, _ -> ., . ->\. *->\*
+        bool doEscape = false;
+        for (string::const_iterator i = s.begin(); i!=s.end(); ++i) {
+            if ( e!=0 && *i==e ) {
+                doEscape = true;
+                continue;
+            }
+            switch(*i) {
+                case '%':
+                    if (doEscape) regex += *i;
+                    else regex += ".*";
+                    break;
+                case '_':
+                    if (doEscape) regex += *i;
+                    else regex += ".";
+                    break;
+                // Don't add any more cases here: these are sufficient,
+                // adding more might turn on inadvertent matching
+                case '\\':
+                case '^':
+                case '$':
+                case '.':
+                case '*':
+                case '[':
+                case ']':
+                    regex += "\\";
+                    // Fallthrough
+                default:
+                    regex += *i;
+                    break;
+            }
+            doEscape = false;
+        }
+        regex += "$";
+        return regex;
     }
 
-    virtual BoolOrNone eval_bool(const SelectorEnv& /*env*/) const {
-        return BN_UNKNOWN;
+public:
+    LikeExpression(Expression* e_, const string& like, const string& escape="") :
+        e(e_),
+        regex(toRegex(like, escape))
+    {
+        // TODO errors
+        ::regcomp(&regexBuffer, regex.c_str(), REG_NOSUB);
+    }
+
+    ~LikeExpression() {
+        ::regfree(&regexBuffer);
+    }
+
+    void repr(ostream& os) const {
+        os << *e << " REGEX_MATCH '" << regex << "'";
+    }
+
+    BoolOrNone eval_bool(const SelectorEnv& env) const {
+        Value v(e->eval(env));
+        if ( v.type!=Value::T_STRING ) return BN_UNKNOWN;
+        // TODO errors
+        return BoolOrNone(::regexec(&regexBuffer, v.s->c_str(), 0, 0, 0)==0);
     }
 };
 
@@ -513,22 +569,22 @@ BoolExpression* parseAndExpression(Tokeniser& tokeniser)
     return e.release();
 }
 
-BoolExpression* parseSpecialComparisons(Tokeniser& tokeniser, Expression* e1) {
+BoolExpression* parseSpecialComparisons(Tokeniser& tokeniser, std::auto_ptr<Expression> e1) {
     switch (tokeniser.nextToken().type) {
         case T_LIKE: {
-            const Token& t = tokeniser.nextToken();
+            const Token t = tokeniser.nextToken();
             if ( t.type==T_STRING ) {
                 // Check for "ESCAPE"
                 if ( tokeniser.nextToken().type==T_ESCAPE ) {
                     const Token e = tokeniser.nextToken();
                     if ( e.type==T_STRING ) {
-                        return new LikeExpression(e1, t.val, e.val);
+                        return new LikeExpression(e1.release(), t.val, e.val);
                     } else {
                         return 0;
                     }
                 } else {
                     tokeniser.returnTokens();
-                    return new LikeExpression(e1, t.val);
+                    return new LikeExpression(e1.release(), t.val);
                 }
             } else {
                 return 0;
@@ -571,18 +627,19 @@ BoolExpression* parseComparisonExpression(Tokeniser& tokeniser)
                     return 0;
             }
         case T_NOT: {
-            std::auto_ptr<BoolExpression> e(parseSpecialComparisons(tokeniser, e1.release()));
+            std::auto_ptr<BoolExpression> e(parseSpecialComparisons(tokeniser, e1));
             if (!e.get()) return 0;
             return new UnaryBooleanExpression<BoolExpression>(&notOp, e.release());
+        }
+        case T_LIKE: {
+            tokeniser.returnTokens();
+            std::auto_ptr<BoolExpression> e(parseSpecialComparisons(tokeniser, e1));
+            if (!e.get()) return 0;
+            return e.release();
         }
         default:
             break;
     }
-    tokeniser.returnTokens();
-
-    // Check for "LIKE" etc.
-    std::auto_ptr<BoolExpression> e(parseSpecialComparisons(tokeniser, e1.get()));
-    if (e.get()) {e1.release(); return e.release();}
     tokeniser.returnTokens();
 
     const Token op = tokeniser.nextToken();
