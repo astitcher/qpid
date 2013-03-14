@@ -80,11 +80,34 @@
  *
  */
 
-namespace qpid {
-namespace broker {
-
 using std::string;
 using std::ostream;
+
+namespace qpid {
+
+class regex {
+    ::regex_t re;
+
+public:
+    regex(const string& s, int /*dummy*/) {
+        int rc = ::regcomp(&re, s.c_str(), REG_NOSUB);
+        if (rc != 0) throw std::logic_error("Regular expression compilation error");
+    }
+
+    ~regex() {
+        ::regfree(&re);
+    }
+
+    friend bool regex_match(const string& s, const regex& re);
+
+    static const int basic = 0; // dummy value
+};
+
+bool regex_match(const string& s, const regex& re) {
+    return ::regexec(&(re.re), s.c_str(), 0, 0, 0)==0;
+}
+
+namespace broker {
 
 class Expression {
 public:
@@ -249,8 +272,8 @@ public:
 
 class LikeExpression : public BoolExpression {
     boost::scoped_ptr<Expression> e;
-    string regex;
-    ::regex_t regexBuffer;
+    string reString;
+    qpid::regex regexBuffer;
 
     static string toRegex(const string& s, const string& escape) {
         string regex("^");
@@ -299,24 +322,18 @@ class LikeExpression : public BoolExpression {
 public:
     LikeExpression(Expression* e_, const string& like, const string& escape="") :
         e(e_),
-        regex(toRegex(like, escape))
-    {
-        int rc = ::regcomp(&regexBuffer, regex.c_str(), REG_NOSUB);
-        if (rc != 0) throw std::logic_error("Like: Regular expression compilation error");
-    }
-
-    ~LikeExpression() {
-        ::regfree(&regexBuffer);
-    }
+        reString(toRegex(like, escape)),
+        regexBuffer(reString, qpid::regex::basic)
+    {}
 
     void repr(ostream& os) const {
-        os << *e << " REGEX_MATCH '" << regex << "'";
+        os << *e << " REGEX_MATCH '" << reString << "'";
     }
 
     BoolOrNone eval_bool(const SelectorEnv& env) const {
         Value v(e->eval(env));
         if ( v.type!=Value::T_STRING ) return BN_UNKNOWN;
-        return BoolOrNone(::regexec(&regexBuffer, v.s->c_str(), 0, 0, 0)==0);
+        return BoolOrNone(qpid::regex_match(*v.s, regexBuffer));
     }
 };
 
