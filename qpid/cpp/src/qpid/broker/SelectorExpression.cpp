@@ -67,8 +67,10 @@
  *
  * ComparisonExpression ::= PrimaryExpression "IS" "NULL" |
  *                          PrimaryExpression "IS" "NOT" "NULL" |
- *                          PrimaryExpression "LIKE" LiteralString [ "ESCAPE" LiteralString ]
- *                          PrimaryExpression "NOT" "LIKE" LiteralString [ "ESCAPE" LiteralString ]
+ *                          PrimaryExpression "LIKE" LiteralString [ "ESCAPE" LiteralString ] |
+ *                          PrimaryExpression "NOT" "LIKE" LiteralString [ "ESCAPE" LiteralString ] |
+ *                          PrimaryExpression "BETWEEN" PrimaryExpression "AND" PrimaryExpression |
+ *                          PrimaryExpression "NOT" "BETWEEN" PrimaryExpression "AND" PrimaryExpression |
  *                          PrimaryExpression ComparisonOpsOps PrimaryExpression |
  *                          "NOT" ComparisonExpression |
  *                          "(" OrExpression ")"
@@ -372,6 +374,45 @@ public:
     }
 };
 
+class LazyEval : public Expression {
+
+    class Impl {
+        mutable Value cachedValue;
+        boost::scoped_ptr<Expression> expression;
+
+    public:
+        Impl(Expression* exp) :
+            expression(exp)
+        {}
+
+        void repr(ostream& os) const {
+            os << "[[" << *expression << "]]";
+        }
+
+        Value eval(const SelectorEnv& env) const {
+            if (cachedValue.type==Value::T_UNKNOWN) {
+                cachedValue = expression->eval(env);
+            }
+            return cachedValue;
+        }
+    };
+    boost::shared_ptr<Impl> impl;
+
+public:
+    LazyEval(Expression* exp) :
+        impl(new Impl(exp))
+    {}
+    // Default Copy constructor is good
+
+    void repr(ostream& os) const {
+        impl->repr(os);
+    }
+
+    Value eval(const SelectorEnv& env) const {
+        return impl->eval(env);
+    }
+};
+
 ////////////////////////////////////////////////////
 
 // Some operators...
@@ -570,22 +611,28 @@ BoolExpression* parseSpecialComparisons(Tokeniser& tokeniser, std::auto_ptr<Expr
     switch (tokeniser.nextToken().type) {
         case T_LIKE: {
             const Token t = tokeniser.nextToken();
-            if ( t.type==T_STRING ) {
-                // Check for "ESCAPE"
-                if ( tokeniser.nextToken().type==T_ESCAPE ) {
-                    const Token e = tokeniser.nextToken();
-                    if ( e.type==T_STRING ) {
-                        return new LikeExpression(e1.release(), t.val, e.val);
-                    } else {
-                        return 0;
-                    }
-                } else {
-                    tokeniser.returnTokens();
-                    return new LikeExpression(e1.release(), t.val);
-                }
+            if ( t.type!=T_STRING ) return 0;
+            // Check for "ESCAPE"
+            if ( tokeniser.nextToken().type==T_ESCAPE ) {
+                const Token e = tokeniser.nextToken();
+                if ( e.type!=T_STRING ) return 0;
+                return new LikeExpression(e1.release(), t.val, e.val);
             } else {
-                return 0;
+                tokeniser.returnTokens();
+                return new LikeExpression(e1.release(), t.val);
             }
+        }
+        case T_BETWEEN: {
+            std::auto_ptr<Expression> lower(parsePrimaryExpression(tokeniser));
+            if ( !lower.get() ) return 0;
+            if ( tokeniser.nextToken().type!=T_AND ) return 0;
+            std::auto_ptr<Expression> upper(parsePrimaryExpression(tokeniser));
+            if ( !upper.get() ) return 0;
+            LazyEval le(e1.release());
+            return new AndExpression(
+                new ComparisonExpression(&greqOp, new LazyEval(le), lower.release()),
+                new ComparisonExpression(&lseqOp, new LazyEval(le), upper.release())
+            );
         }
         default:
             return 0;
@@ -628,11 +675,10 @@ BoolExpression* parseComparisonExpression(Tokeniser& tokeniser)
             if (!e.get()) return 0;
             return new UnaryBooleanExpression<BoolExpression>(&notOp, e.release());
         }
+        case T_BETWEEN:
         case T_LIKE: {
             tokeniser.returnTokens();
-            std::auto_ptr<BoolExpression> e(parseSpecialComparisons(tokeniser, e1));
-            if (!e.get()) return 0;
-            return e.release();
+            return parseSpecialComparisons(tokeniser, e1);
         }
         default:
             break;
