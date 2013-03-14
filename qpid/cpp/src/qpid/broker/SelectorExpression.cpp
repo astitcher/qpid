@@ -25,6 +25,7 @@
 #include "qpid/broker/SelectorToken.h"
 #include "qpid/broker/SelectorValue.h"
 #include "qpid/sys/IntegerTypes.h"
+#include "qpid/sys/regex.h"
 
 #include <string>
 #include <memory>
@@ -32,16 +33,6 @@
 
 #include <boost/scoped_ptr.hpp>
 #include <boost/lexical_cast.hpp>
-
-#ifdef _POSIX_SOURCE
-// Pull in POSIX regex
-# include <regex.h>
-#elif defined(_MSC_VER)
-// Pull in Visual Studio tr1 regex
-# include <regex>
-#else
-#error "No known regex implementation"
-#endif
 
 /*
  * Syntax for JMS style selector expressions (informal):
@@ -92,39 +83,6 @@ using std::string;
 using std::ostream;
 
 namespace qpid {
-
-#ifdef _POSIX_SOURCE
-
-class regex {
-    ::regex_t re;
-
-public:
-    regex(const string& s, int /*dummy*/) {
-        int rc = ::regcomp(&re, s.c_str(), REG_NOSUB);
-        if (rc != 0) throw std::logic_error("Regular expression compilation error");
-    }
-
-    ~regex() {
-        ::regfree(&re);
-    }
-
-    friend bool regex_match(const string& s, const regex& re);
-
-    static const int basic = 0; // dummy value
-};
-
-bool regex_match(const string& s, const regex& re) {
-    return ::regexec(&(re.re), s.c_str(), 0, 0, 0)==0;
-}
-
-#elif defined(_MSC_VER)
-
-using std::tr1::regex;
-using std::tr1::regex_match;
-
-#else
-#error "No known regex implementation"
-#endif
 namespace broker {
 
 class Expression {
@@ -291,7 +249,7 @@ public:
 class LikeExpression : public BoolExpression {
     boost::scoped_ptr<Expression> e;
     string reString;
-    qpid::regex regexBuffer;
+    qpid::sys::regex regexBuffer;
 
     static string toRegex(const string& s, const string& escape) {
         string regex("^");
@@ -346,7 +304,7 @@ public:
     LikeExpression(Expression* e_, const string& like, const string& escape="") :
         e(e_),
         reString(toRegex(like, escape)),
-        regexBuffer(reString, qpid::regex::basic)
+        regexBuffer(reString)
     {}
 
     void repr(ostream& os) const {
@@ -356,7 +314,7 @@ public:
     BoolOrNone eval_bool(const SelectorEnv& env) const {
         Value v(e->eval(env));
         if ( v.type!=Value::T_STRING ) return BN_UNKNOWN;
-        return BoolOrNone(qpid::regex_match(*v.s, regexBuffer));
+        return BoolOrNone(qpid::sys::regex_match(*v.s, regexBuffer));
     }
 };
 
