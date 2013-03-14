@@ -33,8 +33,8 @@
 #include <boost/scoped_ptr.hpp>
 #include <boost/lexical_cast.hpp>
 
-// Pull in Posix regex
-#include <regex.h>
+// Pull in tr1 regex
+#include <regex>
 
 /*
  * Syntax for JMS style selector expressions (informal):
@@ -81,6 +81,10 @@
  */
 
 namespace qpid {
+
+using std::tr1::regex;
+using std::tr1::regex_match;
+
 namespace broker {
 
 using std::string;
@@ -250,7 +254,7 @@ public:
 class LikeExpression : public BoolExpression {
     boost::scoped_ptr<Expression> e;
     string regex;
-    ::regex_t regexBuffer;
+    qpid::regex regexBuffer;
 
     static string toRegex(const string& s, const string& escape) {
         string regex("^");
@@ -275,6 +279,12 @@ class LikeExpression : public BoolExpression {
                     if (doEscape) regex += *i;
                     else regex += ".";
                     break;
+                case ']':
+                    regex += "[]]";
+                    break;
+                case '-':
+                    regex += "[-]";
+                    break;
                 // Don't add any more cases here: these are sufficient,
                 // adding more might turn on inadvertent matching
                 case '\\':
@@ -283,7 +293,6 @@ class LikeExpression : public BoolExpression {
                 case '.':
                 case '*':
                 case '[':
-                case ']':
                     regex += "\\";
                     // Fallthrough
                 default:
@@ -299,14 +308,9 @@ class LikeExpression : public BoolExpression {
 public:
     LikeExpression(Expression* e_, const string& like, const string& escape="") :
         e(e_),
-        regex(toRegex(like, escape))
+        regex(toRegex(like, escape)),
+        regexBuffer(regex, qpid::regex::basic)
     {
-        int rc = ::regcomp(&regexBuffer, regex.c_str(), REG_NOSUB);
-        if (rc != 0) throw std::logic_error("Like: Regular expression compilation error");
-    }
-
-    ~LikeExpression() {
-        ::regfree(&regexBuffer);
     }
 
     void repr(ostream& os) const {
@@ -316,7 +320,7 @@ public:
     BoolOrNone eval_bool(const SelectorEnv& env) const {
         Value v(e->eval(env));
         if ( v.type!=Value::T_STRING ) return BN_UNKNOWN;
-        return BoolOrNone(::regexec(&regexBuffer, v.s->c_str(), 0, 0, 0)==0);
+        return BoolOrNone(qpid::regex_match(*v.s, regexBuffer));
     }
 };
 
