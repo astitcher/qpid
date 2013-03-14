@@ -33,8 +33,15 @@
 #include <boost/scoped_ptr.hpp>
 #include <boost/lexical_cast.hpp>
 
-// Pull in Posix regex
-#include <regex.h>
+#ifdef _POSIX_SOURCE
+// Pull in POSIX regex
+# include <regex.h>
+#elif defined(_MSC_VER)
+// Pull in Visual Studio tr1 regex
+# include <regex>
+#else
+#error "No known regex implementation"
+#endif
 
 /*
  * Syntax for JMS style selector expressions (informal):
@@ -80,10 +87,13 @@
  *
  */
 
+
 using std::string;
 using std::ostream;
 
 namespace qpid {
+
+#ifdef _POSIX_SOURCE
 
 class regex {
     ::regex_t re;
@@ -107,6 +117,14 @@ bool regex_match(const string& s, const regex& re) {
     return ::regexec(&(re.re), s.c_str(), 0, 0, 0)==0;
 }
 
+#elif defined(_MSC_VER)
+
+using std::tr1::regex;
+using std::tr1::regex_match;
+
+#else
+#error "No known regex implementation"
+#endif
 namespace broker {
 
 class Expression {
@@ -298,6 +316,12 @@ class LikeExpression : public BoolExpression {
                     if (doEscape) regex += *i;
                     else regex += ".";
                     break;
+                case ']':
+                    regex += "[]]";
+                    break;
+                case '-':
+                    regex += "[-]";
+                    break;
                 // Don't add any more cases here: these are sufficient,
                 // adding more might turn on inadvertent matching
                 case '\\':
@@ -306,7 +330,6 @@ class LikeExpression : public BoolExpression {
                 case '.':
                 case '*':
                 case '[':
-                case ']':
                     regex += "\\";
                     // Fallthrough
                 default:
