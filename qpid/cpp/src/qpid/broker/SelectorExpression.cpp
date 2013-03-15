@@ -320,6 +320,34 @@ public:
     }
 };
 
+class BetweenExpression : public BoolExpression {
+    boost::scoped_ptr<Expression> e;
+    boost::scoped_ptr<Expression> l;
+    boost::scoped_ptr<Expression> u;
+
+public:
+    BetweenExpression(Expression* e_, Expression* l_, Expression* u_) :
+        e(e_),
+        l(l_),
+        u(u_)
+    {}
+
+    void repr(ostream& os) const {
+        os << *e << " BETWEEN " << *l << " AND " << *u;
+    }
+
+    BoolOrNone eval_bool(const SelectorEnv& env) const {
+        Value ve(e->eval(env));
+        if (unknown(ve)) return BN_UNKNOWN;
+        Value vl(l->eval(env));
+        if (unknown(vl)) return BN_UNKNOWN;
+        if (ve<vl) return BN_FALSE;
+        Value vu(u->eval(env));
+        if (unknown(vu)) return BN_UNKNOWN;
+        return BoolOrNone(ve<=vu);
+    }
+};
+
 // Expression types...
 
 class Literal : public Expression {
@@ -371,33 +399,6 @@ public:
 
     Value eval(const SelectorEnv& env) const {
         return env.value(identifier);
-    }
-};
-
-class CommonExpression : public Expression {
-
-    struct Impl {
-        boost::scoped_ptr<Expression> expression;
-
-        Impl(Expression* exp) :
-            expression(exp)
-        {}
-    };
-    boost::shared_ptr<Impl> impl;
-
-public:
-    CommonExpression(Expression* exp) :
-        impl(new Impl(exp))
-    {}
-    // Default Copy constructor is good
-    // Default assignment operator is good
-
-    void repr(ostream& os) const {
-        os << "((" << *impl->expression << "))";
-    }
-
-    Value eval(const SelectorEnv& env) const {
-        return impl->expression->eval(env);
     }
 };
 
@@ -616,11 +617,7 @@ BoolExpression* parseSpecialComparisons(Tokeniser& tokeniser, std::auto_ptr<Expr
             if ( tokeniser.nextToken().type!=T_AND ) return 0;
             std::auto_ptr<Expression> upper(parsePrimaryExpression(tokeniser));
             if ( !upper.get() ) return 0;
-            CommonExpression ce(e1.release());
-            return new AndExpression(
-                new ComparisonExpression(&greqOp, new CommonExpression(ce), lower.release()),
-                new ComparisonExpression(&lseqOp, new CommonExpression(ce), upper.release())
-            );
+            return new BetweenExpression(e1.release(), lower.release(), upper.release());
         }
         default:
             return 0;
