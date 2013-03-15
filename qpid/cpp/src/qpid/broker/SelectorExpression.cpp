@@ -63,21 +63,32 @@
  *
  * OrExpression ::= AndExpression  ( "OR" AndExpression )*
  *
- * AndExpression :: = EqualityExpression ( "AND" EqualityExpression  )*
+ * AndExpression :: = ComparisonExpression ( "AND" ComparisonExpression )*
  *
- * ComparisonExpression ::= PrimaryExpression "IS" "NULL" |
- *                          PrimaryExpression "IS" "NOT" "NULL" |
- *                          PrimaryExpression "LIKE" LiteralString [ "ESCAPE" LiteralString ] |
- *                          PrimaryExpression "NOT" "LIKE" LiteralString [ "ESCAPE" LiteralString ] |
- *                          PrimaryExpression "BETWEEN" PrimaryExpression "AND" PrimaryExpression |
- *                          PrimaryExpression "NOT" "BETWEEN" PrimaryExpression "AND" PrimaryExpression |
- *                          PrimaryExpression ComparisonOpsOps PrimaryExpression |
+ * ComparisonExpression ::= AddExpression "IS" "NULL" |
+ *                          AddExpression "IS" "NOT" "NULL" |
+ *                          AddExpression "LIKE" LiteralString [ "ESCAPE" LiteralString ] |
+ *                          AddExpression "NOT" "LIKE" LiteralString [ "ESCAPE" LiteralString ] |
+ *                          AddExpression "BETWEEN" AddExpression "AND" AddExpression |
+ *                          AddExpression "NOT" "BETWEEN" AddExpression "AND" AddExpression |
+ *                          AddExpression ComparisonOps AddExpression |
  *                          "NOT" ComparisonExpression |
- *                          "(" OrExpression ")"
+ *                          AddExpression
+ *
+ * AddOps ::= "+" | "-"
+ *
+ * MultiplyOps ::= "*" | "-"
+ *
+ * AddExpression :: = MultiplyExpression (  AddOps MultiplyExpression )*
+ *
+ * MultiplyExpression :: = UnaryArithExpression ( MultiplyOps UnaryArithExpression )*
+ *
+ * UnaryArithExpression ::= AddOps AddExpression |
+ *                          "(" OrExpression ")" |
+ *                          PrimaryExpression
  *
  * PrimaryExpression :: = Identifier |
  *                        Literal
- *
  */
 
 
@@ -92,6 +103,12 @@ public:
     virtual ~Expression() {}
     virtual void repr(std::ostream&) const = 0;
     virtual Value eval(const SelectorEnv&) const = 0;
+
+    virtual BoolOrNone eval_bool(const SelectorEnv& env) const {
+        Value v = eval(env);
+        if (v.type==Value::T_BOOL) return BoolOrNone(v.b);
+        else return BN_UNKNOWN;
+    }
 };
 
 class BoolExpression : public Expression {
@@ -122,6 +139,20 @@ public:
     virtual BoolOrNone eval(T&, const SelectorEnv&) const = 0;
 };
 
+class ArithmeticOperator {
+public:
+    virtual ~ArithmeticOperator() {}
+    virtual void repr(ostream&) const = 0;
+    virtual Value eval(Expression&, Expression&, const SelectorEnv&) const = 0;
+};
+
+class UnaryArithmeticOperator {
+public:
+    virtual ~UnaryArithmeticOperator() {}
+    virtual void repr(ostream&) const = 0;
+    virtual Value eval(Expression&, const SelectorEnv&) const = 0;
+};
+
 ////////////////////////////////////////////////////
 
 // Convenience outputters
@@ -140,6 +171,18 @@ ostream& operator<<(ostream& os, const ComparisonOperator& e)
 
 template <typename T>
 ostream& operator<<(ostream& os, const UnaryBooleanOperator<T>& e)
+{
+    e.repr(os);
+    return os;
+}
+
+ostream& operator<<(ostream& os, const ArithmeticOperator& e)
+{
+    e.repr(os);
+    return os;
+}
+
+ostream& operator<<(ostream& os, const UnaryArithmeticOperator& e)
 {
     e.repr(os);
     return os;
@@ -169,11 +212,11 @@ public:
 };
 
 class OrExpression : public BoolExpression {
-    boost::scoped_ptr<BoolExpression> e1;
-    boost::scoped_ptr<BoolExpression> e2;
+    boost::scoped_ptr<Expression> e1;
+    boost::scoped_ptr<Expression> e2;
 
 public:
-    OrExpression(BoolExpression* e, BoolExpression* e_):
+    OrExpression(Expression* e, Expression* e_):
         e1(e),
         e2(e_)
     {}
@@ -193,11 +236,11 @@ public:
 };
 
 class AndExpression : public BoolExpression {
-    boost::scoped_ptr<BoolExpression> e1;
-    boost::scoped_ptr<BoolExpression> e2;
+    boost::scoped_ptr<Expression> e1;
+    boost::scoped_ptr<Expression> e2;
 
 public:
-    AndExpression(BoolExpression* e, BoolExpression* e_):
+    AndExpression(Expression* e, Expression* e_):
         e1(e),
         e2(e_)
     {}
@@ -333,6 +376,48 @@ public:
         if (!unknown(vu) && ve>vu) return BN_FALSE;
         if (unknown(vl) || unknown(vu)) return BN_UNKNOWN;
         return BN_TRUE;
+    }
+};
+
+// Arithmetic Expression types
+
+class ArithmeticExpression : public Expression {
+    ArithmeticOperator* op;
+    boost::scoped_ptr<Expression> e1;
+    boost::scoped_ptr<Expression> e2;
+
+public:
+    ArithmeticExpression(ArithmeticOperator* o, Expression* e, Expression* e_):
+        op(o),
+        e1(e),
+        e2(e_)
+    {}
+
+    void repr(ostream& os) const {
+        os << "(" << *e1 << *op << *e2 << ")";
+    }
+
+    Value eval(const SelectorEnv& env) const {
+        return op->eval(*e1, *e2, env);
+    }
+};
+
+class UnaryArithExpression : public Expression {
+    UnaryArithmeticOperator* op;
+    boost::scoped_ptr<Expression> e1;
+
+public:
+    UnaryArithExpression(UnaryArithmeticOperator* o, Expression* e) :
+        op(o),
+        e1(e)
+    {}
+
+    void repr(ostream& os) const {
+        os << *op << "(" << *e1 << ")";
+    }
+
+    Value eval(const SelectorEnv& env) const {
+        return op->eval(*e1, env);
     }
 };
 
@@ -496,15 +581,65 @@ class IsNonNull : public UnaryBooleanOperator<Expression> {
 };
 
 // "NOT"
-class Not : public UnaryBooleanOperator<BoolExpression> {
+class Not : public UnaryBooleanOperator<Expression> {
     void repr(ostream& os) const {
         os << "NOT";
     }
 
-    BoolOrNone eval(BoolExpression& e, const SelectorEnv& env) const {
+    BoolOrNone eval(Expression& e, const SelectorEnv& env) const {
         BoolOrNone bn = e.eval_bool(env);
         if (bn==BN_UNKNOWN) return bn;
         else return BoolOrNone(!bn);
+    }
+};
+
+class Negate : public UnaryArithmeticOperator {
+    void repr(ostream& os) const {
+        os << "-";
+    }
+
+    Value eval(Expression& e, const SelectorEnv& env) const {
+        return -e.eval(env);
+    }
+};
+
+class Add : public ArithmeticOperator {
+    void repr(ostream& os) const {
+        os << "+";
+    }
+
+    Value eval(Expression& e1, Expression& e2, const SelectorEnv& env) const {
+        return e1.eval(env)+e2.eval(env);
+    }
+};
+
+class Sub : public ArithmeticOperator {
+    void repr(ostream& os) const {
+        os << "-";
+    }
+
+    Value eval(Expression& e1, Expression& e2, const SelectorEnv& env) const {
+        return e1.eval(env)-e2.eval(env);
+    }
+};
+
+class Mult : public ArithmeticOperator {
+    void repr(ostream& os) const {
+        os << "*";
+    }
+
+    Value eval(Expression& e1, Expression& e2, const SelectorEnv& env) const {
+        return e1.eval(env)*e2.eval(env);
+    }
+};
+
+class Div : public ArithmeticOperator {
+    void repr(ostream& os) const {
+        os << "/";
+    }
+
+    Value eval(Expression& e1, Expression& e2, const SelectorEnv& env) const {
+        return e1.eval(env)/e2.eval(env);
     }
 };
 
@@ -518,16 +653,25 @@ IsNull isNullOp;
 IsNonNull isNonNullOp;
 Not notOp;
 
+Negate negate;
+Add add;
+Sub sub;
+Mult mult;
+Div div;
+
 ////////////////////////////////////////////////////
 
-BoolExpression* parseOrExpression(Tokeniser&);
-BoolExpression* parseAndExpression(Tokeniser&);
-BoolExpression* parseComparisonExpression(Tokeniser&);
+Expression* parseOrExpression(Tokeniser&);
+Expression* parseAndExpression(Tokeniser&);
+Expression* parseComparisonExpression(Tokeniser&);
+Expression* parseAddExpression(Tokeniser&);
+Expression* parseMultiplyExpression(Tokeniser&);
+Expression* parseUnaryArithExpression(Tokeniser&);
 Expression* parsePrimaryExpression(Tokeniser&);
 
 // Top level parser
 class TopBoolExpression : public TopExpression {
-    boost::scoped_ptr<BoolExpression> expression;
+    boost::scoped_ptr<Expression> expression;
 
     void repr(ostream& os) const {
         expression->repr(os);
@@ -540,7 +684,7 @@ class TopBoolExpression : public TopExpression {
     }
 
 public:
-    TopBoolExpression(BoolExpression* be) :
+    TopBoolExpression(Expression* be) :
         expression(be)
     {}
 };
@@ -550,19 +694,19 @@ TopExpression* TopExpression::parse(const string& exp)
     string::const_iterator s = exp.begin();
     string::const_iterator e = exp.end();
     Tokeniser tokeniser(s,e);
-    std::auto_ptr<BoolExpression> b(parseOrExpression(tokeniser));
+    std::auto_ptr<Expression> b(parseOrExpression(tokeniser));
     if (!b.get()) throw std::range_error("Illegal selector: couldn't parse");
     if (tokeniser.nextToken().type != T_EOS) throw std::range_error("Illegal selector: too much input");
     return new TopBoolExpression(b.release());
 }
 
-BoolExpression* parseOrExpression(Tokeniser& tokeniser)
+Expression* parseOrExpression(Tokeniser& tokeniser)
 {
-    std::auto_ptr<BoolExpression> e(parseAndExpression(tokeniser));
+    std::auto_ptr<Expression> e(parseAndExpression(tokeniser));
     if (!e.get()) return 0;
     while ( tokeniser.nextToken().type==T_OR ) {
-        std::auto_ptr<BoolExpression> e1(e);
-        std::auto_ptr<BoolExpression> e2(parseAndExpression(tokeniser));
+        std::auto_ptr<Expression> e1(e);
+        std::auto_ptr<Expression> e2(parseAndExpression(tokeniser));
         if (!e2.get()) return 0;
         e.reset(new OrExpression(e1.release(), e2.release()));
     }
@@ -570,13 +714,13 @@ BoolExpression* parseOrExpression(Tokeniser& tokeniser)
     return e.release();
 }
 
-BoolExpression* parseAndExpression(Tokeniser& tokeniser)
+Expression* parseAndExpression(Tokeniser& tokeniser)
 {
-    std::auto_ptr<BoolExpression> e(parseComparisonExpression(tokeniser));
+    std::auto_ptr<Expression> e(parseComparisonExpression(tokeniser));
     if (!e.get()) return 0;
     while ( tokeniser.nextToken().type==T_AND ) {
-        std::auto_ptr<BoolExpression> e1(e);
-        std::auto_ptr<BoolExpression> e2(parseComparisonExpression(tokeniser));
+        std::auto_ptr<Expression> e1(e);
+        std::auto_ptr<Expression> e2(parseComparisonExpression(tokeniser));
         if (!e2.get()) return 0;
         e.reset(new AndExpression(e1.release(), e2.release()));
     }
@@ -600,10 +744,10 @@ BoolExpression* parseSpecialComparisons(Tokeniser& tokeniser, std::auto_ptr<Expr
             }
         }
         case T_BETWEEN: {
-            std::auto_ptr<Expression> lower(parsePrimaryExpression(tokeniser));
+            std::auto_ptr<Expression> lower(parseAddExpression(tokeniser));
             if ( !lower.get() ) return 0;
             if ( tokeniser.nextToken().type!=T_AND ) return 0;
-            std::auto_ptr<Expression> upper(parsePrimaryExpression(tokeniser));
+            std::auto_ptr<Expression> upper(parseAddExpression(tokeniser));
             if ( !upper.get() ) return 0;
             return new BetweenExpression(e1.release(), lower.release(), upper.release());
         }
@@ -612,22 +756,17 @@ BoolExpression* parseSpecialComparisons(Tokeniser& tokeniser, std::auto_ptr<Expr
     }
 }
 
-BoolExpression* parseComparisonExpression(Tokeniser& tokeniser)
+Expression* parseComparisonExpression(Tokeniser& tokeniser)
 {
     const Token t = tokeniser.nextToken();
-    if ( t.type==T_LPAREN ) {
-        std::auto_ptr<BoolExpression> e(parseOrExpression(tokeniser));
+    if ( t.type==T_NOT ) {
+        std::auto_ptr<Expression> e(parseComparisonExpression(tokeniser));
         if (!e.get()) return 0;
-        if ( tokeniser.nextToken().type!=T_RPAREN ) return 0;
-        return e.release();
-    } else if ( t.type==T_NOT ) {
-        std::auto_ptr<BoolExpression> e(parseComparisonExpression(tokeniser));
-        if (!e.get()) return 0;
-        return new UnaryBooleanExpression<BoolExpression>(&notOp, e.release());
+        return new UnaryBooleanExpression<Expression>(&notOp, e.release());
     }
 
     tokeniser.returnTokens();
-    std::auto_ptr<Expression> e1(parsePrimaryExpression(tokeniser));
+    std::auto_ptr<Expression> e1(parseAddExpression(tokeniser));
     if (!e1.get()) return 0;
 
     switch (tokeniser.nextToken().type) {
@@ -646,7 +785,7 @@ BoolExpression* parseComparisonExpression(Tokeniser& tokeniser)
         case T_NOT: {
             std::auto_ptr<BoolExpression> e(parseSpecialComparisons(tokeniser, e1));
             if (!e.get()) return 0;
-            return new UnaryBooleanExpression<BoolExpression>(&notOp, e.release());
+            return new UnaryBooleanExpression<Expression>(&notOp, e.release());
         }
         case T_BETWEEN:
         case T_LIKE: {
@@ -660,10 +799,11 @@ BoolExpression* parseComparisonExpression(Tokeniser& tokeniser)
 
     const Token op = tokeniser.nextToken();
     if (op.type != T_OPERATOR) {
-        return 0;
+        tokeniser.returnTokens();
+        return e1.release();
     }
 
-    std::auto_ptr<Expression> e2(parsePrimaryExpression(tokeniser));
+    std::auto_ptr<Expression> e2(parseAddExpression(tokeniser));
     if (!e2.get()) return 0;
 
     if (op.val == "=") return new ComparisonExpression(&eqOp, e1.release(), e2.release());
@@ -674,6 +814,76 @@ BoolExpression* parseComparisonExpression(Tokeniser& tokeniser)
     if (op.val == ">=") return new ComparisonExpression(&greqOp, e1.release(), e2.release());
 
     return 0;
+}
+
+Expression* parseAddExpression(Tokeniser& tokeniser)
+{
+    std::auto_ptr<Expression> e(parseMultiplyExpression(tokeniser));
+    if (!e.get()) return 0;
+
+    Token t = tokeniser.nextToken();
+    while (t.type==T_OPERATOR ) {
+        ArithmeticOperator* op;
+        if (t.val == "+") op = &add;
+        else if (t.val == "-") op = &sub;
+        else break;
+        std::auto_ptr<Expression> e1(e);
+        std::auto_ptr<Expression> e2(parseMultiplyExpression(tokeniser));
+        if (!e2.get()) return 0;
+        e.reset(new ArithmeticExpression(op, e1.release(), e2.release()));
+        t = tokeniser.nextToken();
+    }
+
+    tokeniser.returnTokens();
+    return e.release();
+}
+
+Expression* parseMultiplyExpression(Tokeniser& tokeniser)
+{
+    std::auto_ptr<Expression> e(parseUnaryArithExpression(tokeniser));
+    if (!e.get()) return 0;
+
+    Token t = tokeniser.nextToken();
+    while (t.type==T_OPERATOR ) {
+        ArithmeticOperator* op;
+        if (t.val == "*") op = &mult;
+        else if (t.val == "/") op = &div;
+        else break;
+        std::auto_ptr<Expression> e1(e);
+        std::auto_ptr<Expression> e2(parseMultiplyExpression(tokeniser));
+        if (!e2.get()) return 0;
+        e.reset(new ArithmeticExpression(op, e1.release(), e2.release()));
+        t = tokeniser.nextToken();
+    }
+
+    tokeniser.returnTokens();
+    return e.release();
+}
+
+Expression* parseUnaryArithExpression(Tokeniser& tokeniser)
+{
+    const Token t = tokeniser.nextToken();
+    switch (t.type) {
+    case T_LPAREN: {
+        std::auto_ptr<Expression> e(parseOrExpression(tokeniser));
+        if (!e.get()) return 0;
+        if ( tokeniser.nextToken().type!=T_RPAREN ) return 0;
+        return e.release();
+        }
+    case T_OPERATOR:
+        if (t.val == "+") break; // Unary + is no op
+        if (t.val == "-") {
+            std::auto_ptr<Expression> e(parseUnaryArithExpression(tokeniser));
+            if (!e.get()) return 0;
+            return new UnaryArithExpression(&negate, e.release());
+        }
+    default:
+        break;
+    }
+
+    tokeniser.returnTokens();
+    std::auto_ptr<Expression> e(parsePrimaryExpression(tokeniser));
+    return e.release();
 }
 
 Expression* parsePrimaryExpression(Tokeniser& tokeniser)

@@ -179,7 +179,6 @@ QPID_AUTO_TEST_CASE(parseStringFail)
     BOOST_CHECK_THROW(qb::Selector e("A is null not"), std::range_error);
     BOOST_CHECK_THROW(qb::Selector e("A is null or not"), std::range_error);
     BOOST_CHECK_THROW(qb::Selector e("A is null or and"), std::range_error);
-    BOOST_CHECK_THROW(qb::Selector e("A is null and 'hello out there'"), std::range_error);
     BOOST_CHECK_THROW(qb::Selector e("A is null and (B='hello out there'"), std::range_error);
     BOOST_CHECK_THROW(qb::Selector e("in='hello kitty'"), std::range_error);
     BOOST_CHECK_THROW(qb::Selector e("A like 234"), std::range_error);
@@ -187,8 +186,42 @@ QPID_AUTO_TEST_CASE(parseStringFail)
     BOOST_CHECK_THROW(qb::Selector e("A not like 'eclecti_' escape 'happy'"), std::range_error);
     BOOST_CHECK_THROW(qb::Selector e("A not like 'eclecti_' escape happy"), std::range_error);
     BOOST_CHECK_THROW(qb::Selector e("A BETWEEN AND 'true'"), std::range_error);
-    BOOST_CHECK_THROW(qb::Selector e("A NOT BETWEEN (X=Y) AND 3.9"), std::range_error);
     BOOST_CHECK_THROW(qb::Selector e("A NOT BETWEEN 34 OR 3.9"), std::range_error);
+}
+
+QPID_AUTO_TEST_CASE(parseString)
+{
+    BOOST_CHECK_NO_THROW(qb::Selector e("'Daft' is not null"));
+    BOOST_CHECK_NO_THROW(qb::Selector e("42 is null"));
+    BOOST_CHECK_NO_THROW(qb::Selector e("A is not null"));
+    BOOST_CHECK_NO_THROW(qb::Selector e("A is null"));
+    BOOST_CHECK_NO_THROW(qb::Selector e("A = C"));
+    BOOST_CHECK_NO_THROW(qb::Selector e("A <> C"));
+    BOOST_CHECK_NO_THROW(qb::Selector e("A='hello kitty'"));
+    BOOST_CHECK_NO_THROW(qb::Selector e("A<>'hello kitty'"));
+    BOOST_CHECK_NO_THROW(qb::Selector e("A=B"));
+    BOOST_CHECK_NO_THROW(qb::Selector e("A<>B"));
+    BOOST_CHECK_NO_THROW(qb::Selector e("A='hello kitty' OR B='Bye, bye cruel world'"));
+    BOOST_CHECK_NO_THROW(qb::Selector e("B='hello kitty' AnD A='Bye, bye cruel world'"));
+    BOOST_CHECK_NO_THROW(qb::Selector e("A is null or A='Bye, bye cruel world'"));
+    BOOST_CHECK_NO_THROW(qb::Selector e("Z is null OR A is not null and A<>'Bye, bye cruel world'"));
+    BOOST_CHECK_NO_THROW(qb::Selector e("(Z is null OR A is not null) and A<>'Bye, bye cruel world'"));
+    BOOST_CHECK_NO_THROW(qb::Selector e("NOT C is not null OR C is null"));
+    BOOST_CHECK_NO_THROW(qb::Selector e("Not A='' or B=z"));
+    BOOST_CHECK_NO_THROW(qb::Selector e("Not A=17 or B=5.6"));
+    BOOST_CHECK_NO_THROW(qb::Selector e("A<>17 and B=5.6e17"));
+    BOOST_CHECK_NO_THROW(qb::Selector e("A LIKE 'excep%ional'"));
+    BOOST_CHECK_NO_THROW(qb::Selector e("B NOT LIKE 'excep%ional'"));
+    BOOST_CHECK_NO_THROW(qb::Selector e("A LIKE 'excep%ional' EScape '\'"));
+    BOOST_CHECK_NO_THROW(qb::Selector e("A BETWEEN 13 AND 'true'"));
+    BOOST_CHECK_NO_THROW(qb::Selector e("A NOT BETWEEN 100 AND 3.9"));
+    BOOST_CHECK_NO_THROW(qb::Selector e("true"));
+    BOOST_CHECK_NO_THROW(qb::Selector e("-354"));
+    BOOST_CHECK_NO_THROW(qb::Selector e("-(X or Y)"));
+    BOOST_CHECK_NO_THROW(qb::Selector e("-687 or 567"));
+    BOOST_CHECK_NO_THROW(qb::Selector e("(354.6)"));
+    BOOST_CHECK_NO_THROW(qb::Selector e("A is null and 'hello out there'"));
+    BOOST_CHECK_NO_THROW(qb::Selector e("17/4>4"));
 }
 
 class TestSelectorEnv : public qpid::broker::SelectorEnv {
@@ -218,34 +251,6 @@ public:
 };
 
 const qb::Value TestSelectorEnv::EMPTY;
-
-QPID_AUTO_TEST_CASE(parseString)
-{
-    BOOST_CHECK_NO_THROW(qb::Selector e("'Daft' is not null"));
-    BOOST_CHECK_NO_THROW(qb::Selector e("42 is null"));
-    BOOST_CHECK_NO_THROW(qb::Selector e("A is not null"));
-    BOOST_CHECK_NO_THROW(qb::Selector e("A is null"));
-    BOOST_CHECK_NO_THROW(qb::Selector e("A = C"));
-    BOOST_CHECK_NO_THROW(qb::Selector e("A <> C"));
-    BOOST_CHECK_NO_THROW(qb::Selector e("A='hello kitty'"));
-    BOOST_CHECK_NO_THROW(qb::Selector e("A<>'hello kitty'"));
-    BOOST_CHECK_NO_THROW(qb::Selector e("A=B"));
-    BOOST_CHECK_NO_THROW(qb::Selector e("A<>B"));
-    BOOST_CHECK_NO_THROW(qb::Selector e("A='hello kitty' OR B='Bye, bye cruel world'"));
-    BOOST_CHECK_NO_THROW(qb::Selector e("B='hello kitty' AnD A='Bye, bye cruel world'"));
-    BOOST_CHECK_NO_THROW(qb::Selector e("A is null or A='Bye, bye cruel world'"));
-    BOOST_CHECK_NO_THROW(qb::Selector e("Z is null OR A is not null and A<>'Bye, bye cruel world'"));
-    BOOST_CHECK_NO_THROW(qb::Selector e("(Z is null OR A is not null) and A<>'Bye, bye cruel world'"));
-    BOOST_CHECK_NO_THROW(qb::Selector e("NOT C is not null OR C is null"));
-    BOOST_CHECK_NO_THROW(qb::Selector e("Not A='' or B=z"));
-    BOOST_CHECK_NO_THROW(qb::Selector e("Not A=17 or B=5.6"));
-    BOOST_CHECK_NO_THROW(qb::Selector e("A<>17 and B=5.6e17"));
-    BOOST_CHECK_NO_THROW(qb::Selector e("A LIKE 'excep%ional'"));
-    BOOST_CHECK_NO_THROW(qb::Selector e("B NOT LIKE 'excep%ional'"));
-    BOOST_CHECK_NO_THROW(qb::Selector e("A LIKE 'excep%ional' EScape '\'"));
-    BOOST_CHECK_NO_THROW(qb::Selector e("A BETWEEN 13 AND 'true'"));
-    BOOST_CHECK_NO_THROW(qb::Selector e("A NOT BETWEEN 100 AND 3.9"));
-}
 
 QPID_AUTO_TEST_CASE(simpleEval)
 {
@@ -296,13 +301,18 @@ QPID_AUTO_TEST_CASE(numericEval)
     BOOST_CHECK(qb::Selector("B=39.0").eval(env));
     BOOST_CHECK(qb::Selector("Not A=17 or B=5.6").eval(env));
     BOOST_CHECK(!qb::Selector("A<>17 and B=5.6e17").eval(env));
+    BOOST_CHECK(qb::Selector("3 BETWEEN -17 and 98.5").eval(env));
     BOOST_CHECK(qb::Selector("A BETWEEN B and 98.5").eval(env));
     BOOST_CHECK(!qb::Selector("B NOT BETWEEN 35 AND 100").eval(env));
     BOOST_CHECK(!qb::Selector("A BETWEEN B and 40").eval(env));
     BOOST_CHECK(!qb::Selector("A BETWEEN C and 40").eval(env));
     BOOST_CHECK(!qb::Selector("A BETWEEN 45 and C").eval(env));
-    BOOST_CHECK(!qb::Selector("A BETWEEN 40 and C OR A NOT BETWEEN 40 and C").eval(env));
-    BOOST_CHECK(!qb::Selector("A BETWEEN C and 45 OR A NOT BETWEEN C and 45").eval(env));
+    BOOST_CHECK(qb::Selector("(A BETWEEN 40 and C) IS NULL").eval(env));
+    BOOST_CHECK(qb::Selector("(A BETWEEN C and 45) IS NULL").eval(env));
+    BOOST_CHECK(qb::Selector("17/4=4").eval(env));
+    BOOST_CHECK(!qb::Selector("A/0=0").eval(env));
+    BOOST_CHECK(qb::Selector("A*B+19<A*(B+19)").eval(env));
+    BOOST_CHECK(qb::Selector("-A=0-A").eval(env));
 }
 
 QPID_AUTO_TEST_CASE(comparisonEval)
