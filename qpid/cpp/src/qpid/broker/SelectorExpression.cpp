@@ -374,42 +374,30 @@ public:
     }
 };
 
-class LazyEval : public Expression {
+class CommonExpression : public Expression {
 
-    class Impl {
-        mutable Value cachedValue;
+    struct Impl {
         boost::scoped_ptr<Expression> expression;
 
-    public:
         Impl(Expression* exp) :
             expression(exp)
         {}
-
-        void repr(ostream& os) const {
-            os << "[[" << *expression << "]]";
-        }
-
-        Value eval(const SelectorEnv& env) const {
-            if (cachedValue.type==Value::T_UNKNOWN) {
-                cachedValue = expression->eval(env);
-            }
-            return cachedValue;
-        }
     };
     boost::shared_ptr<Impl> impl;
 
 public:
-    LazyEval(Expression* exp) :
+    CommonExpression(Expression* exp) :
         impl(new Impl(exp))
     {}
     // Default Copy constructor is good
+    // Default assignment operator is good
 
     void repr(ostream& os) const {
-        impl->repr(os);
+        os << "((" << *impl->expression << "))";
     }
 
     Value eval(const SelectorEnv& env) const {
-        return impl->eval(env);
+        return impl->expression->eval(env);
     }
 };
 
@@ -628,10 +616,10 @@ BoolExpression* parseSpecialComparisons(Tokeniser& tokeniser, std::auto_ptr<Expr
             if ( tokeniser.nextToken().type!=T_AND ) return 0;
             std::auto_ptr<Expression> upper(parsePrimaryExpression(tokeniser));
             if ( !upper.get() ) return 0;
-            LazyEval le(e1.release());
+            CommonExpression ce(e1.release());
             return new AndExpression(
-                new ComparisonExpression(&greqOp, new LazyEval(le), lower.release()),
-                new ComparisonExpression(&lseqOp, new LazyEval(le), upper.release())
+                new ComparisonExpression(&greqOp, new CommonExpression(ce), lower.release()),
+                new ComparisonExpression(&lseqOp, new CommonExpression(ce), upper.release())
             );
         }
         default:
