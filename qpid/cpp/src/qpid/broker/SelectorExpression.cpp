@@ -393,13 +393,24 @@ public:
 
     void repr(ostream& os) const {
         os << *e << " IN (";
-        for (unsigned i = 0; i<l.size(); ++i){
+        for (std::size_t i = 0; i<l.size(); ++i){
             os << l[i] << (i<l.size()-1 ? ", " : ")");
         }
     }
 
-    BoolOrNone eval_bool(const SelectorEnv&) const {
-        return BN_UNKNOWN;
+    BoolOrNone eval_bool(const SelectorEnv& env) const {
+        Value ve(e->eval(env));
+        if (unknown(ve)) return BN_UNKNOWN;
+        BoolOrNone r = BN_FALSE;
+        for (std::size_t i = 0; i<l.size(); ++i){
+            Value li(l[i].eval(env));
+            if (unknown(li)) {
+                r = BN_UNKNOWN;
+                continue;
+            }
+            if (ve==li) return BN_TRUE;
+        }
+        return r;
     }
 };
 
