@@ -51,7 +51,17 @@ typedef enum {
     T_NUMERIC_APPROX,
     T_LPAREN,
     T_RPAREN,
-    T_OPERATOR
+    T_COMMA,
+    T_PLUS,
+    T_MINUS,
+    T_MULT,
+    T_DIV,
+    T_EQUAL,
+    T_NEQ,
+    T_LESS,
+    T_GRT,
+    T_LSEQ,
+    T_GREQ
 } TokenType;
 
 struct Token {
@@ -84,14 +94,7 @@ public:
     TokenException(const std::string&);
 };
 
-QPID_BROKER_EXTERN bool tokeniseEos(std::string::const_iterator& s, std::string::const_iterator& e, Token& tok);
-QPID_BROKER_EXTERN bool tokeniseIdentifier(std::string::const_iterator& s, std::string::const_iterator& e, Token& tok);
-QPID_BROKER_EXTERN bool tokeniseReservedWord(std::string::const_iterator& s, std::string::const_iterator& e, Token& tok);
-QPID_BROKER_EXTERN bool tokeniseIdentifierOrReservedWord(std::string::const_iterator& s, std::string::const_iterator& e, Token& tok);
-QPID_BROKER_EXTERN bool tokeniseString(std::string::const_iterator& s, std::string::const_iterator& e, Token& tok);
-QPID_BROKER_EXTERN bool tokeniseParens(std::string::const_iterator& s, std::string::const_iterator& e, Token& tok);
-QPID_BROKER_EXTERN bool tokeniseOperator(std::string::const_iterator& s, std::string::const_iterator& e, Token& tok);
-QPID_BROKER_EXTERN bool tokeniseNumeric(std::string::const_iterator& s, std::string::const_iterator& e, Token& tok);
+QPID_BROKER_EXTERN bool tokenise(std::string::const_iterator& s, std::string::const_iterator& e, Token& tok);
 
 class Tokeniser {
     std::vector<Token> tokens;

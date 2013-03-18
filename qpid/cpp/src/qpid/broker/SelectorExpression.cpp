@@ -730,29 +730,29 @@ Expression* parseAndExpression(Tokeniser& tokeniser)
 
 BoolExpression* parseSpecialComparisons(Tokeniser& tokeniser, std::auto_ptr<Expression> e1) {
     switch (tokeniser.nextToken().type) {
-        case T_LIKE: {
-            const Token t = tokeniser.nextToken();
-            if ( t.type!=T_STRING ) return 0;
-            // Check for "ESCAPE"
-            if ( tokeniser.nextToken().type==T_ESCAPE ) {
-                const Token e = tokeniser.nextToken();
-                if ( e.type!=T_STRING ) return 0;
-                return new LikeExpression(e1.release(), t.val, e.val);
-            } else {
-                tokeniser.returnTokens();
-                return new LikeExpression(e1.release(), t.val);
-            }
+    case T_LIKE: {
+        const Token t = tokeniser.nextToken();
+        if ( t.type!=T_STRING ) return 0;
+        // Check for "ESCAPE"
+        if ( tokeniser.nextToken().type==T_ESCAPE ) {
+            const Token e = tokeniser.nextToken();
+            if ( e.type!=T_STRING ) return 0;
+            return new LikeExpression(e1.release(), t.val, e.val);
+        } else {
+            tokeniser.returnTokens();
+            return new LikeExpression(e1.release(), t.val);
         }
-        case T_BETWEEN: {
-            std::auto_ptr<Expression> lower(parseAddExpression(tokeniser));
-            if ( !lower.get() ) return 0;
-            if ( tokeniser.nextToken().type!=T_AND ) return 0;
-            std::auto_ptr<Expression> upper(parseAddExpression(tokeniser));
-            if ( !upper.get() ) return 0;
-            return new BetweenExpression(e1.release(), lower.release(), upper.release());
-        }
-        default:
-            return 0;
+    }
+    case T_BETWEEN: {
+        std::auto_ptr<Expression> lower(parseAddExpression(tokeniser));
+        if ( !lower.get() ) return 0;
+        if ( tokeniser.nextToken().type!=T_AND ) return 0;
+        std::auto_ptr<Expression> upper(parseAddExpression(tokeniser));
+        if ( !upper.get() ) return 0;
+        return new BetweenExpression(e1.release(), lower.release(), upper.release());
+    }
+    default:
+        return 0;
     }
 }
 
@@ -770,35 +770,42 @@ Expression* parseComparisonExpression(Tokeniser& tokeniser)
     if (!e1.get()) return 0;
 
     switch (tokeniser.nextToken().type) {
-        // Check for "IS NULL" and "IS NOT NULL"
-        case T_IS:
-            // The rest must be T_NULL or T_NOT, T_NULL
-            switch (tokeniser.nextToken().type) {
-                case T_NULL:
-                    return new UnaryBooleanExpression<Expression>(&isNullOp, e1.release());
-                case T_NOT:
-                    if ( tokeniser.nextToken().type == T_NULL)
-                        return new UnaryBooleanExpression<Expression>(&isNonNullOp, e1.release());
-                default:
-                    return 0;
-            }
-        case T_NOT: {
-            std::auto_ptr<BoolExpression> e(parseSpecialComparisons(tokeniser, e1));
-            if (!e.get()) return 0;
-            return new UnaryBooleanExpression<Expression>(&notOp, e.release());
+    // Check for "IS NULL" and "IS NOT NULL"
+    case T_IS:
+        // The rest must be T_NULL or T_NOT, T_NULL
+        switch (tokeniser.nextToken().type) {
+            case T_NULL:
+                return new UnaryBooleanExpression<Expression>(&isNullOp, e1.release());
+            case T_NOT:
+                if ( tokeniser.nextToken().type == T_NULL)
+                    return new UnaryBooleanExpression<Expression>(&isNonNullOp, e1.release());
+            default:
+                return 0;
         }
-        case T_BETWEEN:
-        case T_LIKE: {
-            tokeniser.returnTokens();
-            return parseSpecialComparisons(tokeniser, e1);
-        }
-        default:
-            break;
+    case T_NOT: {
+        std::auto_ptr<BoolExpression> e(parseSpecialComparisons(tokeniser, e1));
+        if (!e.get()) return 0;
+        return new UnaryBooleanExpression<Expression>(&notOp, e.release());
+    }
+    case T_BETWEEN:
+    case T_LIKE: {
+        tokeniser.returnTokens();
+        return parseSpecialComparisons(tokeniser, e1);
+    }
+    default:
+        break;
     }
     tokeniser.returnTokens();
 
-    const Token op = tokeniser.nextToken();
-    if (op.type != T_OPERATOR) {
+    ComparisonOperator* op;
+    switch (tokeniser.nextToken().type) {
+    case T_EQUAL: op = &eqOp; break;
+    case T_NEQ: op = &neqOp; break;
+    case T_LESS: op = &lsOp; break;
+    case T_GRT: op = &grOp; break;
+    case T_LSEQ: op = &lseqOp; break;
+    case T_GREQ: op = &greqOp; break;
+    default:
         tokeniser.returnTokens();
         return e1.release();
     }
@@ -806,14 +813,7 @@ Expression* parseComparisonExpression(Tokeniser& tokeniser)
     std::auto_ptr<Expression> e2(parseAddExpression(tokeniser));
     if (!e2.get()) return 0;
 
-    if (op.val == "=") return new ComparisonExpression(&eqOp, e1.release(), e2.release());
-    if (op.val == "<>") return new ComparisonExpression(&neqOp, e1.release(), e2.release());
-    if (op.val == "<") return new ComparisonExpression(&lsOp, e1.release(), e2.release());
-    if (op.val == ">") return new ComparisonExpression(&grOp, e1.release(), e2.release());
-    if (op.val == "<=") return new ComparisonExpression(&lseqOp, e1.release(), e2.release());
-    if (op.val == ">=") return new ComparisonExpression(&greqOp, e1.release(), e2.release());
-
-    return 0;
+    return new ComparisonExpression(op, e1.release(), e2.release());
 }
 
 Expression* parseAddExpression(Tokeniser& tokeniser)
@@ -822,11 +822,14 @@ Expression* parseAddExpression(Tokeniser& tokeniser)
     if (!e.get()) return 0;
 
     Token t = tokeniser.nextToken();
-    while (t.type==T_OPERATOR ) {
+    while (t.type==T_PLUS || t.type==T_MINUS ) {
         ArithmeticOperator* op;
-        if (t.val == "+") op = &add;
-        else if (t.val == "-") op = &sub;
-        else break;
+        switch (t.type) {
+        case T_PLUS: op = &add; break;
+        case T_MINUS: op = &sub; break;
+        default:
+            return 0;
+        }
         std::auto_ptr<Expression> e1(e);
         std::auto_ptr<Expression> e2(parseMultiplyExpression(tokeniser));
         if (!e2.get()) return 0;
@@ -844,11 +847,14 @@ Expression* parseMultiplyExpression(Tokeniser& tokeniser)
     if (!e.get()) return 0;
 
     Token t = tokeniser.nextToken();
-    while (t.type==T_OPERATOR ) {
+    while (t.type==T_MULT || t.type==T_DIV ) {
         ArithmeticOperator* op;
-        if (t.val == "*") op = &mult;
-        else if (t.val == "/") op = &div;
-        else break;
+        switch (t.type) {
+        case T_MULT: op = &mult; break;
+        case T_DIV: op = &div; break;
+        default:
+            return 0;
+        }
         std::auto_ptr<Expression> e1(e);
         std::auto_ptr<Expression> e2(parseMultiplyExpression(tokeniser));
         if (!e2.get()) return 0;
@@ -869,14 +875,14 @@ Expression* parseUnaryArithExpression(Tokeniser& tokeniser)
         if (!e.get()) return 0;
         if ( tokeniser.nextToken().type!=T_RPAREN ) return 0;
         return e.release();
-        }
-    case T_OPERATOR:
-        if (t.val == "+") break; // Unary + is no op
-        if (t.val == "-") {
-            std::auto_ptr<Expression> e(parseUnaryArithExpression(tokeniser));
-            if (!e.get()) return 0;
-            return new UnaryArithExpression(&negate, e.release());
-        }
+    }
+    case T_PLUS:
+        break; // Unary + is no op
+    case T_MINUS: {
+        std::auto_ptr<Expression> e(parseUnaryArithExpression(tokeniser));
+        if (!e.get()) return 0;
+        return new UnaryArithExpression(&negate, e.release());
+    }
     default:
         break;
     }

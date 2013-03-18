@@ -38,14 +38,7 @@ namespace qb = qpid::broker;
 using qpid::broker::Token;
 using qpid::broker::TokenType;
 using qpid::broker::Tokeniser;
-using qpid::broker::tokeniseEos;
-using qpid::broker::tokeniseIdentifier;
-using qpid::broker::tokeniseIdentifierOrReservedWord;
-using qpid::broker::tokeniseReservedWord;
-using qpid::broker::tokeniseOperator;
-using qpid::broker::tokeniseParens;
-using qpid::broker::tokeniseNumeric;
-using qpid::broker::tokeniseString;
+using qpid::broker::tokenise;
 
 namespace qpid {
 namespace tests {
@@ -53,6 +46,88 @@ namespace tests {
 QPID_AUTO_TEST_SUITE(SelectorSuite)
 
 typedef bool (*TokeniseF)(string::const_iterator&,string::const_iterator&,Token&);
+
+bool tokeniseEos(std::string::const_iterator& s, std::string::const_iterator& e, Token& tok)
+{
+    Token t1;
+    std::string::const_iterator t = s;
+    bool r = tokenise(t, e, t1);
+    if (r && (t1.type==qb::T_EOS)) {tok = t1; s = t; return true;}
+    return false;
+}
+
+bool tokeniseParens(std::string::const_iterator& s, std::string::const_iterator& e, Token& tok)
+{
+    Token t1;
+    std::string::const_iterator t = s;
+    bool r = tokenise(t, e, t1);
+    if (r && (t1.type==qb::T_LPAREN || t1.type==qb::T_RPAREN)) {tok = t1; s = t; return true;}
+    return false;
+}
+
+bool tokeniseOperator(std::string::const_iterator& s, std::string::const_iterator& e, Token& tok)
+{
+    Token t1;
+    std::string::const_iterator t = s;
+    bool r = tokenise(t, e, t1);
+    if (r && (t1.type>=qb::T_PLUS && t1.type<=qb::T_GREQ)) {tok = t1; s = t; return true;}
+    return false;
+}
+
+bool tokeniseString(std::string::const_iterator& s, std::string::const_iterator& e, Token& tok)
+{
+    Token t1;
+    std::string::const_iterator t = s;
+    bool r = tokenise(t, e, t1);
+    if (r && (t1.type==qb::T_STRING)) {tok = t1; s = t; return true;}
+    return false;
+}
+
+bool tokeniseIdentifier(std::string::const_iterator& s, std::string::const_iterator& e, Token& tok)
+{
+    Token t1;
+    std::string::const_iterator t = s;
+    bool r = tokenise(t, e, t1);
+    if (r && (t1.type==qb::T_IDENTIFIER)) {tok = t1; s = t; return true;}
+    return false;
+}
+
+bool tokeniseReservedWord(std::string::const_iterator& s, std::string::const_iterator& e, Token& tok)
+{
+    std::string::const_iterator t = s;
+    Token t1;
+    if (tokenise(t, e, t1)) {
+    switch (t1.type) {
+    case qb::T_AND:
+    case qb::T_BETWEEN:
+    case qb::T_ESCAPE:
+    case qb::T_FALSE:
+    case qb::T_IN:
+    case qb::T_IS:
+    case qb::T_LIKE:
+    case qb::T_NOT:
+    case qb::T_NULL:
+    case qb::T_OR:
+    case qb::T_TRUE:
+        tok = t1;
+        s = t;
+        return true;
+    default:
+        break;
+    }
+    }
+    return false;
+}
+
+bool tokeniseNumeric(std::string::const_iterator& s, std::string::const_iterator& e, Token& tok)
+{
+    Token t1;
+    std::string::const_iterator t = s;
+    bool r = tokenise(t, e, t1);
+    if (r && (t1.type==qb::T_NUMERIC_EXACT || t1.type==qb::T_NUMERIC_APPROX)) {tok = t1; s = t; return true;}
+    return false;
+}
+
 
 void verifyTokeniserSuccess(TokeniseF t, const char* ss, TokenType tt, const char* tv, const char* fs) {
     Token tok;
@@ -75,29 +150,29 @@ void verifyTokeniserFail(TokeniseF t, const char* c) {
 
 QPID_AUTO_TEST_CASE(tokeniseSuccess)
 {
-    verifyTokeniserSuccess(&tokeniseEos, "", qb::T_EOS, "", "");
-    verifyTokeniserSuccess(&tokeniseIdentifier, "null_123+blah", qb::T_IDENTIFIER, "null_123", "+blah");
-    verifyTokeniserSuccess(&tokeniseIdentifierOrReservedWord, "null_123+blah", qb::T_IDENTIFIER, "null_123", "+blah");
-    verifyTokeniserSuccess(&tokeniseIdentifierOrReservedWord, "null+blah", qb::T_NULL, "null", "+blah");
-    verifyTokeniserSuccess(&tokeniseIdentifierOrReservedWord, "null+blah", qb::T_NULL, "null", "+blah");
-    verifyTokeniserSuccess(&tokeniseIdentifierOrReservedWord, "Is nOt null", qb::T_IS, "Is", " nOt null");
-    verifyTokeniserSuccess(&tokeniseIdentifierOrReservedWord, "nOt null", qb::T_NOT, "nOt", " null");
-    verifyTokeniserSuccess(&tokeniseIdentifierOrReservedWord, "Is nOt null", qb::T_IS, "Is", " nOt null");
-    verifyTokeniserSuccess(&tokeniseString, "'Hello World'", qb::T_STRING, "Hello World", "");
-    verifyTokeniserSuccess(&tokeniseString, "'Hello World''s end'a bit more", qb::T_STRING, "Hello World's end", "a bit more");
-    verifyTokeniserSuccess(&tokeniseOperator, "=blah", qb::T_OPERATOR, "=", "blah");
-    verifyTokeniserSuccess(&tokeniseOperator, "<> Identifier", qb::T_OPERATOR, "<>", " Identifier");
-    verifyTokeniserSuccess(&tokeniseParens, "(a and b) not c", qb::T_LPAREN, "(", "a and b) not c");
-    verifyTokeniserSuccess(&tokeniseParens, ") not c", qb::T_RPAREN, ")", " not c");
-    verifyTokeniserSuccess(&tokeniseNumeric, "019kill", qb::T_NUMERIC_EXACT, "019", "kill");
-    verifyTokeniserSuccess(&tokeniseNumeric, "0kill", qb::T_NUMERIC_EXACT, "0", "kill");
-    verifyTokeniserSuccess(&tokeniseNumeric, "0.kill", qb::T_NUMERIC_APPROX, "0.", "kill");
-    verifyTokeniserSuccess(&tokeniseNumeric, "3.1415=pi", qb::T_NUMERIC_APPROX, "3.1415", "=pi");
-    verifyTokeniserSuccess(&tokeniseNumeric, ".25.kill", qb::T_NUMERIC_APPROX, ".25", ".kill");
-    verifyTokeniserSuccess(&tokeniseNumeric, "2e5.kill", qb::T_NUMERIC_APPROX, "2e5", ".kill");
-    verifyTokeniserSuccess(&tokeniseNumeric, "3.e50easy to kill", qb::T_NUMERIC_APPROX, "3.e50", "easy to kill");
-    verifyTokeniserSuccess(&tokeniseNumeric, "34.25e+50easy to kill", qb::T_NUMERIC_APPROX, "34.25e+50", "easy to kill");
-    verifyTokeniserSuccess(&tokeniseNumeric, "34.e-50easy to kill", qb::T_NUMERIC_APPROX, "34.e-50", "easy to kill");
+    verifyTokeniserSuccess(&tokenise, "", qb::T_EOS, "", "");
+    verifyTokeniserSuccess(&tokenise, "null_123+blah", qb::T_IDENTIFIER, "null_123", "+blah");
+    verifyTokeniserSuccess(&tokenise, "null_123+blah", qb::T_IDENTIFIER, "null_123", "+blah");
+    verifyTokeniserSuccess(&tokenise, "null+blah", qb::T_NULL, "null", "+blah");
+    verifyTokeniserSuccess(&tokenise, "null+blah", qb::T_NULL, "null", "+blah");
+    verifyTokeniserSuccess(&tokenise, "Is nOt null", qb::T_IS, "Is", " nOt null");
+    verifyTokeniserSuccess(&tokenise, "nOt null", qb::T_NOT, "nOt", " null");
+    verifyTokeniserSuccess(&tokenise, "Is nOt null", qb::T_IS, "Is", " nOt null");
+    verifyTokeniserSuccess(&tokenise, "'Hello World'", qb::T_STRING, "Hello World", "");
+    verifyTokeniserSuccess(&tokenise, "'Hello World''s end'a bit more", qb::T_STRING, "Hello World's end", "a bit more");
+    verifyTokeniserSuccess(&tokenise, "=blah", qb::T_EQUAL, "=", "blah");
+    verifyTokeniserSuccess(&tokenise, "<> Identifier", qb::T_NEQ, "<>", " Identifier");
+    verifyTokeniserSuccess(&tokenise, "(a and b) not c", qb::T_LPAREN, "(", "a and b) not c");
+    verifyTokeniserSuccess(&tokenise, ") not c", qb::T_RPAREN, ")", " not c");
+    verifyTokeniserSuccess(&tokenise, "019kill", qb::T_NUMERIC_EXACT, "019", "kill");
+    verifyTokeniserSuccess(&tokenise, "0kill", qb::T_NUMERIC_EXACT, "0", "kill");
+    verifyTokeniserSuccess(&tokenise, "0.kill", qb::T_NUMERIC_APPROX, "0.", "kill");
+    verifyTokeniserSuccess(&tokenise, "3.1415=pi", qb::T_NUMERIC_APPROX, "3.1415", "=pi");
+    verifyTokeniserSuccess(&tokenise, ".25.kill", qb::T_NUMERIC_APPROX, ".25", ".kill");
+    verifyTokeniserSuccess(&tokenise, "2e5.kill", qb::T_NUMERIC_APPROX, "2e5", ".kill");
+    verifyTokeniserSuccess(&tokenise, "3.e50easy to kill", qb::T_NUMERIC_APPROX, "3.e50", "easy to kill");
+    verifyTokeniserSuccess(&tokenise, "34.25e+50easy to kill", qb::T_NUMERIC_APPROX, "34.25e+50", "easy to kill");
+    verifyTokeniserSuccess(&tokenise, "34.e-50easy to kill", qb::T_NUMERIC_APPROX, "34.e-50", "easy to kill");
 }
 
 QPID_AUTO_TEST_CASE(tokeniseFailure)
@@ -135,7 +210,7 @@ QPID_AUTO_TEST_CASE(tokenString)
     Tokeniser t(s, e);
 
     BOOST_CHECK_EQUAL(t.nextToken(), Token(qb::T_IDENTIFIER, "a"));
-    BOOST_CHECK_EQUAL(t.nextToken(), Token(qb::T_OPERATOR, "="));
+    BOOST_CHECK_EQUAL(t.nextToken(), Token(qb::T_EQUAL, "="));
     BOOST_CHECK_EQUAL(t.nextToken(), Token(qb::T_IDENTIFIER, "b"));
     BOOST_CHECK_EQUAL(t.nextToken(), Token(qb::T_EOS, ""));
 
@@ -146,7 +221,7 @@ QPID_AUTO_TEST_CASE(tokenString)
 
     BOOST_CHECK_EQUAL(u.nextToken(), Token(qb::T_NOT, "not"));
     BOOST_CHECK_EQUAL(u.nextToken(), Token(qb::T_STRING, "hello kitty's friend"));
-    BOOST_CHECK_EQUAL(u.nextToken(), Token(qb::T_OPERATOR, "="));
+    BOOST_CHECK_EQUAL(u.nextToken(), Token(qb::T_EQUAL, "="));
     BOOST_CHECK_EQUAL(u.nextToken(), Token(qb::T_IS, "Is"));
     BOOST_CHECK_EQUAL(u.nextToken(), Token(qb::T_NULL, "null"));
     BOOST_CHECK_EQUAL(u.nextToken(), Token(qb::T_EOS, ""));
@@ -165,12 +240,12 @@ QPID_AUTO_TEST_CASE(tokenString)
 
     BOOST_CHECK_EQUAL(v.nextToken(), Token(qb::T_LPAREN, "("));
     BOOST_CHECK_EQUAL(v.nextToken(), Token(qb::T_IDENTIFIER, "a"));
-    BOOST_CHECK_EQUAL(v.nextToken(), Token(qb::T_OPERATOR, "+"));
+    BOOST_CHECK_EQUAL(v.nextToken(), Token(qb::T_PLUS, "+"));
     BOOST_CHECK_EQUAL(v.nextToken(), Token(qb::T_NUMERIC_EXACT, "6"));
     BOOST_CHECK_EQUAL(v.nextToken(), Token(qb::T_RPAREN, ")"));
-    BOOST_CHECK_EQUAL(v.nextToken(), Token(qb::T_OPERATOR, "*"));
+    BOOST_CHECK_EQUAL(v.nextToken(), Token(qb::T_MULT, "*"));
     BOOST_CHECK_EQUAL(v.nextToken(), Token(qb::T_NUMERIC_APPROX, "7.5"));
-    BOOST_CHECK_EQUAL(v.nextToken(), Token(qb::T_OPERATOR, "/"));
+    BOOST_CHECK_EQUAL(v.nextToken(), Token(qb::T_DIV, "/"));
     BOOST_CHECK_EQUAL(v.nextToken(), Token(qb::T_NUMERIC_APPROX, "1e6"));
 }
 
