@@ -106,6 +106,7 @@ class Broker : public sys::Runnable, public Plugin::Target,
         size_t replayHardLimit;
         uint queueLimit;
         bool tcpNoDelay;
+        bool dummy; // Hack to allow option with and without arguments
         bool requireEncrypted;
         std::string knownHosts;
         std::string saslConfigPath;
