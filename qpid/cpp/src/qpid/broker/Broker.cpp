@@ -134,7 +134,6 @@ Broker::Options::Options(const std::string& name) :
     replayHardLimit(0),
     queueLimit(100*1048576/*100M default limit*/),
     tcpNoDelay(true),
-    dummy(true),
     requireEncrypted(false),
     knownHosts(knownHostsNone),
     qmf2Support(true),
@@ -177,8 +176,7 @@ Broker::Options::Options(const std::string& name) :
         ("auth", optValue(auth, "yes|no"), "Enable authentication, if disabled all incoming connections will be trusted")
         ("realm", optValue(realm, "REALM"), "Use the given realm when performing authentication")
         ("default-queue-limit", optValue(queueLimit, "BYTES"), "Default maximum size for queues (in bytes)")
-        ("tcp-nodelay", optValue(dummy), "Obsolete option")
-        ("tcp-nodelay-enable", optValue(tcpNoDelay,"yes|no"), "Set TCP_NODELAY on TCP connections")
+        ("tcp-nodelay", optValue(tcpNoDelay), "Set TCP_NODELAY on TCP connections")
         ("require-encryption", optValue(requireEncrypted), "Only accept connections that are encrypted")
         ("known-hosts-url", optValue(knownHosts, "URL or 'none'"), "URL to send as 'known-hosts' to clients ('none' implies empty list)")
         ("sasl-config", optValue(saslConfigPath, "DIR"), "gets sasl config info from nonstandard location")
