@@ -23,6 +23,7 @@
 
 #include "qpid/Plugin.h"
 #include "qpid/broker/Broker.h"
+#include "qpid/broker/BrokerOptions.h"
 #include "qpid/log/Statement.h"
 #include "qpid/sys/AsynchIO.h"
 #include "qpid/sys/posix/BSDSocket.h"
@@ -70,7 +71,7 @@ static class SocketFDPlugin : public Plugin {
         // Only provide to a Broker
         if (broker) {
             if (!options.socketFds.empty()) {
-                const broker::Broker::Options& opts = broker->getOptions();
+                const broker::BrokerOptions& opts = broker->getOptions();
                 SocketAcceptor* sa = new SocketAcceptor(opts.tcpNoDelay, false, opts.maxNegotiateTime, broker->getTimer());
                 for (unsigned i = 0; i<options.socketFds.size(); ++i) {
                     int fd = options.socketFds[i];

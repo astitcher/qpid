@@ -23,6 +23,7 @@
 
 #include "qpid/Plugin.h"
 #include "qpid/broker/Broker.h"
+#include "qpid/broker/BrokerOptions.h"
 #include "qpid/log/Statement.h"
 #include "qpid/sys/AsynchIO.h"
 #include "qpid/sys/SocketTransport.h"
@@ -87,7 +88,7 @@ static struct SslPlugin : public Plugin {
     void earlyInitialize(Target& target) {
         broker::Broker* broker = dynamic_cast<broker::Broker*>(&target);
         if (broker && !options.certDbPath.empty()) {
-            broker::Broker::Options& opts = broker->getOptions();
+            broker::BrokerOptions& opts = broker->getOptions();
 
             if (opts.port == options.port && // AMQP & AMQPS ports are the same
                 opts.port != 0) {
@@ -114,7 +115,7 @@ static struct SslPlugin : public Plugin {
                     ssl::initNSS(options, true);
                     nssInitialized = true;
 
-                    const broker::Broker::Options& opts = broker->getOptions();
+                    const broker::BrokerOptions& opts = broker->getOptions();
                     TransportAcceptor::shared_ptr ta;
                     SocketAcceptor* sa =
                         new SocketAcceptor(opts.tcpNoDelay, options.nodict, opts.maxNegotiateTime, broker->getTimer());

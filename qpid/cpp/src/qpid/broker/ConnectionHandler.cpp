@@ -24,6 +24,7 @@
 
 #include "qpid/SaslFactory.h"
 #include "qpid/broker/Broker.h"
+#include "qpid/broker/BrokerOptions.h"
 #include "qpid/broker/Connection.h"
 #include "qpid/broker/SecureConnection.h"
 #include "qpid/Url.h"

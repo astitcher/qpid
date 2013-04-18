@@ -21,6 +21,7 @@
 
 #include "qpid/broker/Queue.h"
 #include "qpid/broker/Broker.h"
+#include "qpid/broker/BrokerOptions.h"
 #include "qpid/broker/AclModule.h"
 #include "qpid/broker/QueueCursor.h"
 #include "qpid/broker/QueueDepth.h"
@@ -126,7 +127,7 @@ inline void mgntDeqStats(const Message& msg,
     }
 }
 
-QueueSettings merge(const QueueSettings& inputs, const Broker::Options& globalOptions)
+QueueSettings merge(const QueueSettings& inputs, const BrokerOptions& globalOptions)
 {
     QueueSettings settings(inputs);
     if (!settings.maxDepth.hasSize() && globalOptions.queueLimit) {

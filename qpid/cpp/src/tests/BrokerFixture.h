@@ -23,6 +23,7 @@
  */
 
 #include "qpid/broker/Broker.h"
+#include "qpid/broker/BrokerOptions.h"
 #include "qpid/client/Connection.h"
 #include "qpid/client/ConnectionImpl.h"
 #include "qpid/client/Session.h"
@@ -41,12 +42,13 @@ namespace tests {
  */
 struct  BrokerFixture : private boost::noncopyable {
     typedef qpid::broker::Broker Broker;
+    typedef qpid::broker::BrokerOptions BrokerOptions;
     typedef boost::intrusive_ptr<Broker> BrokerPtr;
 
     BrokerPtr broker;
     qpid::sys::Thread brokerThread;
 
-    BrokerFixture(Broker::Options opts=Broker::Options(), bool enableMgmt=false) {
+    BrokerFixture(BrokerOptions opts=BrokerOptions(), bool enableMgmt=false) {
         // Keep the tests quiet unless logging env. vars have been set by user.
         if (!::getenv("QPID_LOG_ENABLE") && !::getenv("QPID_TRACE")) {
             qpid::log::Options logOpts;
@@ -122,7 +124,7 @@ typedef ClientT<> Client;
 template <class ConnectionType, class SessionType=qpid::client::Session>
 struct  SessionFixtureT : BrokerFixture, ClientT<ConnectionType,SessionType> {
 
-    SessionFixtureT(Broker::Options opts=Broker::Options()) :
+    SessionFixtureT(BrokerOptions opts=BrokerOptions()) :
         BrokerFixture(opts),
         ClientT<ConnectionType,SessionType>(broker->getPort(qpid::broker::Broker::TCP_TRANSPORT))
     {}

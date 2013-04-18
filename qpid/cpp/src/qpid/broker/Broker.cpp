@@ -22,6 +22,7 @@
 #include "qpid/broker/Broker.h"
 
 #include "qpid/broker/AclModule.h"
+#include "qpid/broker/BrokerOptions.h"
 #include "qpid/broker/ConnectionState.h"
 #include "qpid/broker/DirectExchange.h"
 #include "qpid/broker/FanOutExchange.h"
@@ -118,7 +119,7 @@ const std::string amq_match("amq.match");
 const std::string qpid_management("qpid.management");
 const std::string knownHostsNone("none");
 
-Broker::Options::Options(const std::string& name) :
+BrokerOptions::BrokerOptions(const std::string& name) :
     qpid::Options(name),
     noDataDir(0),
     port(DEFAULT_PORT),
@@ -203,10 +204,10 @@ framing::FieldTable noReplicateArgs() {
 }
 }
 
-Broker::Broker(const Broker::Options& conf) :
+Broker::Broker(const BrokerOptions& conf) :
     poller(new Poller),
     timer(new qpid::sys::Timer),
-    config(conf),
+    config(new BrokerOptions(conf)),
     managementAgent(conf.enableMgmt ? new ManagementAgent(conf.qmf1Support,
                                                           conf.qmf2Support)
                                     : 0),
@@ -381,15 +382,39 @@ void Broker::declareStandardExchange(const std::string& name, const std::string&
     }
 }
 
+uint16_t Broker::getLinkHearbeatInterval()
+{
+    return config->linkHeartbeatInterval;
+}
+
+bool Broker::isAuthenticating()
+{
+    return config->auth;
+}
+
+bool Broker::requireEncrypted()
+{
+    return config->requireEncrypted;
+}
+
+std::string Broker::getRealm()
+{
+    return config->realm;
+}
+
+bool Broker::isTimestamping()
+{
+    return config->timestampRcvMsgs;
+}
 
 boost::intrusive_ptr<Broker> Broker::create(int16_t port)
 {
-    Options config;
+    BrokerOptions config;
     config.port=port;
     return create(config);
 }
 
-boost::intrusive_ptr<Broker> Broker::create(const Options& opts)
+boost::intrusive_ptr<Broker> Broker::create(const BrokerOptions& opts)
 {
     return boost::intrusive_ptr<Broker>(new Broker(opts));
 }
@@ -407,10 +432,10 @@ void Broker::setStore () {
 }
 
 void Broker::run() {
-    if (config.workerThreads > 0) {
+    if (config->workerThreads > 0) {
         QPID_LOG(notice, "Broker running");
         Dispatcher d(poller);
-        int numIOThreads = config.workerThreads;
+        int numIOThreads = config->workerThreads;
         std::vector<Thread> t(numIOThreads-1);
 
         // Run n-1 io threads
@@ -425,7 +450,7 @@ void Broker::run() {
             t[i].join();
         }
     } else {
-        throw Exception((boost::format("Invalid value for worker-threads: %1%") % config.workerThreads).str());
+        throw Exception((boost::format("Invalid value for worker-threads: %1%") % config->workerThreads).str());
     }
 }
 
@@ -439,7 +464,7 @@ void Broker::shutdown() {
 Broker::~Broker() {
     shutdown();
     finalize();                 // Finalize any plugins.
-    if (config.auth)
+    if (config->auth)
         SaslAuthenticator::fini();
     timer->stop();
     QPID_LOG(notice, "Shut down");
@@ -992,7 +1017,7 @@ Manageable::status_t Broker::getTimestampConfig(bool& receive,
     if (acl && !acl->authorise(userId, acl::ACT_ACCESS, acl::OBJ_BROKER, name, NULL))  {
         throw framing::UnauthorizedAccessException(QPID_MSG("ACL denied broker timestamp get request from " << userId));
     }
-    receive = config.timestampRcvMsgs;
+    receive = config->timestampRcvMsgs;
     return Manageable::STATUS_OK;
 }
 
@@ -1004,8 +1029,8 @@ Manageable::status_t Broker::setTimestampConfig(const bool receive,
     if (acl && !acl->authorise(userId, acl::ACT_UPDATE, acl::OBJ_BROKER, name, NULL)) {
         throw framing::UnauthorizedAccessException(QPID_MSG("ACL denied broker timestamp set request from " << userId));
     }
-    config.timestampRcvMsgs = receive;
-    QPID_LOG(notice, "Receive message timestamping is " << ((config.timestampRcvMsgs) ? "ENABLED." : "DISABLED."));
+    config->timestampRcvMsgs = receive;
+    QPID_LOG(notice, "Receive message timestamping is " << ((config->timestampRcvMsgs) ? "ENABLED." : "DISABLED."));
     return Manageable::STATUS_OK;
 }
 

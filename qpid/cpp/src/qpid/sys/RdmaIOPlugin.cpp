@@ -23,6 +23,7 @@
 
 #include "qpid/Plugin.h"
 #include "qpid/broker/Broker.h"
+#include "qpid/broker/BrokerOptions.h"
 #include "qpid/broker/NameGenerator.h"
 #include "qpid/framing/AMQP_HighestVersion.h"
 #include "qpid/log/Statement.h"
@@ -274,7 +275,7 @@ static class RdmaIOPlugin : public Plugin {
         broker::Broker* broker = dynamic_cast<broker::Broker*>(&target);
         // Only provide to a Broker
         if (broker) {
-            const broker::Broker::Options& opts = broker->getOptions();
+            const broker::BrokerOptions& opts = broker->getOptions();
             boost::shared_ptr<RdmaIOProtocolFactory> protocol(new RdmaIOProtocolFactory(opts.port, opts.connectionBacklog));
             uint16_t port = protocol->getPort();
             QPID_LOG(notice, "Rdma: Listening on RDMA port " << port);

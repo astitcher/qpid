@@ -32,7 +32,7 @@ void ConnectionState::setUserId(const std::string& uid) {
     userName = userId.substr(0, at);
     isDefaultRealm = (
         at!= std::string::npos &&
-        getBroker().getOptions().realm == userId.substr(at+1,userId.size()));
+        getBroker().getRealm() == userId.substr(at+1,userId.size()));
 }
     
 }}

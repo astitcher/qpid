@@ -19,17 +19,17 @@
  *
  */
 
-#include "qpid/broker/Broker.h"
+#include "qpid/broker/BrokerOptions.h"
 #include <stdlib.h>
 
 namespace qpid {
 namespace broker {
 
-const std::string Broker::Options::DEFAULT_DATA_DIR_LOCATION("/tmp");
-const std::string Broker::Options::DEFAULT_DATA_DIR_NAME("/.qpidd");
+const std::string BrokerOptions::DEFAULT_DATA_DIR_LOCATION("/tmp");
+const std::string BrokerOptions::DEFAULT_DATA_DIR_NAME("/.qpidd");
 
 std::string
-Broker::Options::getHome() {
+BrokerOptions::getHome() {
     std::string home;
     char *home_c = ::getenv("HOME");
     if (home_c != 0)

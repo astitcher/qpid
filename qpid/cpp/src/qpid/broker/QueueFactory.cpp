@@ -20,6 +20,7 @@
  */
 #include "qpid/broker/QueueFactory.h"
 #include "qpid/broker/Broker.h"
+#include "qpid/broker/BrokerOptions.h"
 #include "qpid/broker/QueueSettings.h"
 #include "qpid/broker/Queue.h"
 #include "qpid/broker/LossyQueue.h"

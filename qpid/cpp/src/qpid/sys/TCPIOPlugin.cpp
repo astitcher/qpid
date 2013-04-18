@@ -23,6 +23,7 @@
 
 #include "qpid/Plugin.h"
 #include "qpid/broker/Broker.h"
+#include "qpid/broker/BrokerOptions.h"
 #include "qpid/log/Statement.h"
 #include "qpid/sys/AsynchIO.h"
 #include "qpid/sys/Socket.h"
@@ -54,7 +55,7 @@ static class TCPIOPlugin : public Plugin {
         broker::Broker* broker = dynamic_cast<broker::Broker*>(&target);
         // Only provide to a Broker
         if (broker) {
-            const broker::Broker::Options& opts = broker->getOptions();
+            const broker::BrokerOptions& opts = broker->getOptions();
 
             // Check for SSL on the same port
             bool shouldListen = !sslMultiplexEnabled();

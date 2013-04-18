@@ -1,5 +1,5 @@
-#ifndef _Broker_
-#define _Broker_
+#ifndef QPID_BROKER_BROKER_H
+#define QPID_BROKER_BROKER_H
 
 /*
  *
@@ -63,6 +63,7 @@ struct Url;
 namespace broker {
 
 class AclModule;
+class BrokerOptions;
 class ConnectionState;
 class ExpiryPolicy;
 class Message;
@@ -82,50 +83,6 @@ class Broker : public sys::Runnable, public Plugin::Target,
                public management::Manageable,
                public RefCounted
 {
-  public:
-
-    struct Options : public qpid::Options {
-        static const std::string DEFAULT_DATA_DIR_LOCATION;
-        static const std::string DEFAULT_DATA_DIR_NAME;
-
-        QPID_BROKER_EXTERN Options(const std::string& name="Broker Options");
-
-        bool noDataDir;
-        std::string dataDir;
-        uint16_t port;
-        std::vector<std::string> listenInterfaces;
-        int workerThreads;
-        int connectionBacklog;
-        bool enableMgmt;
-        bool mgmtPublish;
-        uint16_t mgmtPubInterval;
-        uint16_t queueCleanInterval;
-        bool auth;
-        std::string realm;
-        size_t replayFlushLimit;
-        size_t replayHardLimit;
-        uint queueLimit;
-        bool tcpNoDelay;
-        bool requireEncrypted;
-        std::string knownHosts;
-        std::string saslConfigPath;
-        bool qmf2Support;
-        bool qmf1Support;
-        uint queueFlowStopRatio;    // producer flow control: on
-        uint queueFlowResumeRatio;  // producer flow control: off
-        uint16_t queueThresholdEventRatio;
-        std::string defaultMsgGroup;
-        bool timestampRcvMsgs;
-        double linkMaintenanceInterval; // FIXME aconway 2012-02-13: consistent parsing of SECONDS values.
-        uint16_t linkHeartbeatInterval;
-        uint32_t maxNegotiateTime;  // Max time in ms for connection with no negotiation
-        std::string fedTag;
-
-      private:
-        std::string getHome();
-    };
-
-  private:
     struct TransportInfo {
         boost::shared_ptr<sys::TransportAcceptor> acceptor;
         boost::shared_ptr<sys::TransportConnector> connectorFactory;
@@ -166,7 +123,7 @@ class Broker : public sys::Runnable, public Plugin::Target,
                                             const ConnectionState* context);
     boost::shared_ptr<sys::Poller> poller;
     std::auto_ptr<sys::Timer> timer;
-    Options config;
+    std::auto_ptr<BrokerOptions> config;
     std::auto_ptr<management::ManagementAgent> managementAgent;
     TransportMap transportMap;
     std::auto_ptr<MessageStore> store;
@@ -202,8 +159,8 @@ class Broker : public sys::Runnable, public Plugin::Target,
   public:
     QPID_BROKER_EXTERN virtual ~Broker();
 
-    QPID_BROKER_EXTERN Broker(const Options& configuration);
-    static QPID_BROKER_EXTERN boost::intrusive_ptr<Broker> create(const Options& configuration);
+    QPID_BROKER_EXTERN Broker(const BrokerOptions& configuration);
+    static QPID_BROKER_EXTERN boost::intrusive_ptr<Broker> create(const BrokerOptions& configuration);
     static QPID_BROKER_EXTERN boost::intrusive_ptr<Broker> create(int16_t port = DEFAULT_PORT);
 
     /**
@@ -232,7 +189,7 @@ class Broker : public sys::Runnable, public Plugin::Target,
     LinkRegistry& getLinks() { return links; }
     DtxManager& getDtxManager() { return dtxManager; }
     DataDir& getDataDir() { return dataDir; }
-    Options& getOptions() { return config; }
+    BrokerOptions& getOptions() { return *config; }
     ProtocolRegistry& getProtocolRegistry() { return protocolRegistry; }
     ObjectFactoryRegistry& getObjectFactoryRegistry() { return objectFactory; }
 
@@ -296,9 +253,6 @@ class Broker : public sys::Runnable, public Plugin::Target,
 
     management::ManagementAgent* getManagementAgent() { return managementAgent.get(); }
 
-    bool isAuthenticating ( ) { return config.auth; }
-    bool isTimestamping() { return config.timestampRcvMsgs; }
-
     typedef boost::function1<void, boost::shared_ptr<Queue> > QueueFunctor;
 
     QPID_BROKER_EXTERN std::pair<boost::shared_ptr<Queue>, bool> createQueue(
@@ -350,7 +304,12 @@ class Broker : public sys::Runnable, public Plugin::Target,
     QPID_BROKER_EXTERN framing::FieldTable getLinkClientProperties() const;
     QPID_BROKER_EXTERN void setLinkClientProperties(const framing::FieldTable&);
 
-    QPID_BROKER_EXTERN uint16_t getLinkHearbeatInterval() { return config.linkHeartbeatInterval; }
+    QPID_BROKER_EXTERN uint16_t getLinkHearbeatInterval();
+    QPID_BROKER_EXTERN bool isAuthenticating();
+    QPID_BROKER_EXTERN bool requireEncrypted();
+    QPID_BROKER_EXTERN std::string getRealm();
+    QPID_BROKER_EXTERN bool isTimestamping();
+
     /** Information identifying this system */
     boost::shared_ptr<const System> getSystem() const { return systemObject; }
   friend class StatusCheckThread;
@@ -358,4 +317,4 @@ class Broker : public sys::Runnable, public Plugin::Target,
 
 }}
 
-#endif  /*!_Broker_*/
+#endif
