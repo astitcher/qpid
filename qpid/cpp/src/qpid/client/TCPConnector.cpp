@@ -75,7 +75,8 @@ TCPConnector::TCPConnector(Poller::shared_ptr p,
       socket(createSocket()),
       connector(0),
       aio(0),
-      poller(p)
+      poller(p),
+      codec(this)
 {
     QPID_LOG(debug, "TCPConnector created for " << version);
     settings.configureSocket(*socket);
@@ -216,8 +217,6 @@ void TCPConnector::writebuff(AsynchIO& /*aio*/)
     if (closed)
         return;
 
-    Codec* codec = securityLayer.get() ? (Codec*) securityLayer.get() : (Codec*) this;
-
     if (!codec->canEncode()) {
         return;
     }
@@ -263,7 +262,6 @@ size_t TCPConnector::encode(char* buffer, size_t size)
 
 void TCPConnector::readbuff(AsynchIO& aio, AsynchIO::BufferBase* buff)
 {
-    Codec* codec = securityLayer.get() ? (Codec*) securityLayer.get() : (Codec*) this;
     int32_t decoded = codec->decode(buff->bytes+buff->dataStart, buff->dataCount);
     // TODO: unreading needs to go away, and when we can cope
     // with multiple sub-buffers in the general buffer scheme, it will
@@ -322,6 +320,7 @@ void TCPConnector::activateSecurityLayer(std::auto_ptr<qpid::sys::SecurityLayer>
 {
     securityLayer = sl;
     securityLayer->init(this);
+    codec = securityLayer.get();
 }
 
 }} // namespace qpid::client

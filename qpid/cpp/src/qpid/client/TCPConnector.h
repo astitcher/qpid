@@ -73,6 +73,7 @@ class TCPConnector : public Connector, public sys::Codec
     std::string identifier;
     boost::shared_ptr<sys::Poller> poller;
     std::auto_ptr<qpid::sys::SecurityLayer> securityLayer;
+    sys::Codec* codec;
 
     virtual void connected(const sys::Socket&);
     void writeDataBlock(const framing::AMQDataBlock& data);

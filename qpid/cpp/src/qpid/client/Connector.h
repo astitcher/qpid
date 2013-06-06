@@ -62,7 +62,7 @@ class Connector : public framing::FrameHandler
 
     virtual ~Connector() {};
     virtual void connect(const std::string& host, const std::string& port) = 0;
-    virtual void init() {};
+
     virtual void close() = 0;
     virtual void handle(framing::AMQFrame& frame) = 0;
     virtual void abort() = 0;

@@ -271,7 +271,6 @@ void ConnectionImpl::open()
         connector.reset();
         throw TransportFailure(e.what());
     }
-    connector->init();
 
     // Enable heartbeat if requested
     uint16_t heartbeat = static_cast<ConnectionSettings&>(handler).heartbeat;

@@ -41,6 +41,7 @@
 #include <iostream>
 #include <boost/bind.hpp>
 #include <boost/format.hpp>
+#include <boost/scoped_ptr.hpp>
 
 namespace qpid {
 namespace client {
@@ -52,7 +53,7 @@ using boost::format;
 using boost::str;
 
 
-class SslConnector : public Connector
+class SslConnector : public Connector, public Codec
 {
     typedef std::deque<framing::AMQFrame> Frames;
 
@@ -71,12 +72,13 @@ class SslConnector : public Connector
     sys::ShutdownHandler* shutdownHandler;
     framing::InputHandler* input;
 
-    sys::ssl::SslSocket socket;
+    boost::scoped_ptr<sys::Socket> socket;
 
     sys::AsynchConnector* connector;
     sys::AsynchIO* aio;
     std::string identifier;
     Poller::shared_ptr poller;
+    sys::Codec* codec;
     SecuritySettings securitySettings;
 
     ~SslConnector();
@@ -89,6 +91,8 @@ class SslConnector : public Connector
 
     void connect(const std::string& host, const std::string& port);
     void connected(const sys::Socket&);
+    void start(sys::AsynchIO* aio_);
+    void initAmqp();
     void connectFailed(const std::string& msg);
 
     void close();
@@ -153,14 +157,16 @@ SslConnector::SslConnector(Poller::shared_ptr p,
       closed(true),
       shutdownHandler(0),
       input(0),
+      socket(new SslSocket(settings.sslCertName)),
+      connector(0),
       aio(0),
-      poller(p)
+      poller(p),
+      codec(this)
 {
     QPID_LOG(debug, "SslConnector created for " << version.toString());
 
     if (settings.sslCertName != "") {
         QPID_LOG(debug, "ssl-cert-name = " << settings.sslCertName);
-        socket.setCertName(settings.sslCertName);
     }
 }
 
@@ -172,7 +178,7 @@ void SslConnector::connect(const std::string& host, const std::string& port) {
     Mutex::ScopedLock l(lock);
     assert(closed);
     connector = AsynchConnector::create(
-        socket,
+        *socket,
         host, port,
         boost::bind(&SslConnector::connected, this, _1),
         boost::bind(&SslConnector::connectFailed, this, _3));
@@ -183,7 +189,7 @@ void SslConnector::connect(const std::string& host, const std::string& port) {
 
 void SslConnector::connected(const Socket&) {
     connector = 0;
-    aio = AsynchIO::create(socket,
+    aio = AsynchIO::create(*socket,
                            boost::bind(&SslConnector::readbuff, this, _1, _2),
                            boost::bind(&SslConnector::eof, this, _1),
                            boost::bind(&SslConnector::disconnected, this, _1),
@@ -191,17 +197,28 @@ void SslConnector::connected(const Socket&) {
                            0, // nobuffs
                            boost::bind(&SslConnector::writebuff, this, _1));
 
+    start(aio);
+    initAmqp();
+    aio->start(poller);
+}
+
+void SslConnector::start(sys::AsynchIO* aio_) {
+    aio = aio_;
+
     aio->createBuffers(maxFrameSize);
-    identifier = str(format("[%1%]") % socket.getFullAddress());
+
+    identifier = str(format("[%1%]") % socket->getFullAddress());
+}
+
+void SslConnector::initAmqp() {
     ProtocolInitiation init(version);
     writeDataBlock(init);
-    aio->start(poller);
 }
 
 void SslConnector::connectFailed(const std::string& msg) {
     connector = 0;
     QPID_LOG(warning, "Connect failed: " << msg);
-    socket.close();
+    socket->close();
     if (!closed)
         closed = true;
     if (shutdownHandler)
@@ -234,7 +251,7 @@ void SslConnector::abort() {
     if (!closed) {
         if (aio) {
             // Established connection
-            aio->requestCallback(boost::bind(&SslConnector::eof, this, _1));
+            aio->requestCallback(boost::bind(&SslConnector::disconnected, this, _1));
         } else if (connector) {
             // We're still connecting
             connector->requestCallback(boost::bind(&SslConnector::connectAborted, this));
@@ -289,7 +306,7 @@ void SslConnector::writebuff(AsynchIO& /*aio*/)
     if (closed)
         return;
 
-    if (!canEncode()) {
+    if (!codec->canEncode()) {
         return;
     }
 
@@ -334,7 +351,7 @@ size_t SslConnector::encode(char* buffer, size_t size)
 
 void SslConnector::readbuff(AsynchIO& aio, AsynchIOBufferBase* buff)
 {
-    int32_t decoded = decode(buff->bytes+buff->dataStart, buff->dataCount);
+    int32_t decoded = codec->decode(buff->bytes+buff->dataStart, buff->dataCount);
     // TODO: unreading needs to go away, and when we can cope
     // with multiple sub-buffers in the general buffer scheme, it will
     if (decoded < buff->dataCount) {
@@ -385,12 +402,12 @@ void SslConnector::eof(AsynchIO&) {
 
 void SslConnector::disconnected(AsynchIO&) {
     close();
-    socketClosed(*aio, socket);
+    socketClosed(*aio, *socket);
 }
 
 const SecuritySettings* SslConnector::getSecuritySettings()
 {
-    securitySettings.ssf = socket.getKeyLen();
+    securitySettings.ssf = socket->getKeyLen();
     securitySettings.authid = "dummy";//set to non-empty string to enable external authentication
     return &securitySettings;
 }
