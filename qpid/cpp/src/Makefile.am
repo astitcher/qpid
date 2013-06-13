@@ -918,6 +918,8 @@ libqpidclient_la_SOURCES =			\
   qpid/client/SessionBase_0_10Access.h		\
   qpid/client/SessionImpl.cpp			\
   qpid/client/SessionImpl.h 			\
+  qpid/client/SocketConnector.cpp		\
+  qpid/client/SocketConnector.h			\
   qpid/client/StateManager.cpp			\
   qpid/client/StateManager.h			\
   qpid/client/Subscription.cpp			\
@@ -926,8 +928,7 @@ libqpidclient_la_SOURCES =			\
   qpid/client/SubscriptionManager.cpp		\
   qpid/client/SubscriptionManagerImpl.cpp	\
   qpid/client/SubscriptionManagerImpl.h		\
-  qpid/client/TCPConnector.cpp			\
-  qpid/client/TCPConnector.h
+  qpid/client/TCPConnector.cpp
 
 QPIDCLIENT_VERSION_INFO  = 2:0:0
 libqpidclient_la_LDFLAGS = -version-info $(QPIDCLIENT_VERSION_INFO)

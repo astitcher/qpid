@@ -18,108 +18,36 @@
  * under the License.
  *
  */
-#include "qpid/client/Connector.h"
+#include "qpid/client/SocketConnector.h"
 
 #include "config.h"
-#include "qpid/client/Bounds.h"
-#include "qpid/client/ConnectionImpl.h"
-#include "qpid/client/ConnectionSettings.h"
-#include "qpid/Options.h"
-#include "qpid/log/Statement.h"
-#include "qpid/sys/Time.h"
-#include "qpid/framing/AMQFrame.h"
-#include "qpid/framing/InitiationHandler.h"
-#include "qpid/sys/ssl/util.h"
-#include "qpid/sys/AsynchIO.h"
-#include "qpid/sys/ssl/SslSocket.h"
-#include "qpid/sys/SocketAddress.h"
-#include "qpid/sys/Dispatcher.h"
-#include "qpid/sys/Poller.h"
-#include "qpid/sys/SecuritySettings.h"
-#include "qpid/Msg.h"
 
-#include <iostream>
-#include <boost/bind.hpp>
-#include <boost/format.hpp>
-#include <boost/scoped_ptr.hpp>
+#include "qpid/client/Connector.h"
+#include "qpid/client/ConnectionImpl.h"
+#include "qpid/log/Statement.h"
+#include "qpid/sys/ssl/util.h"
+#include "qpid/sys/ssl/SslSocket.h"
 
 namespace qpid {
+
+namespace sys {
+class Poller;
+}
+
 namespace client {
 
 using namespace qpid::sys;
 using namespace qpid::sys::ssl;
-using namespace qpid::framing;
-using boost::format;
-using boost::str;
-
-
-class SslConnector : public Connector, public Codec
-{
-    typedef std::deque<framing::AMQFrame> Frames;
-
-    const uint16_t maxFrameSize;
-
-    sys::Mutex lock;
-    Frames frames;
-    size_t lastEof; // Position after last EOF in frames
-    uint64_t currentSize;
-    Bounds* bounds;
-
-    framing::ProtocolVersion version;
-    bool initiated;
-    bool closed;
-
-    sys::ShutdownHandler* shutdownHandler;
-    framing::InputHandler* input;
-
-    boost::scoped_ptr<sys::Socket> socket;
-
-    sys::AsynchConnector* connector;
-    sys::AsynchIO* aio;
-    std::string identifier;
-    Poller::shared_ptr poller;
-    sys::Codec* codec;
-    SecuritySettings securitySettings;
-
-    ~SslConnector();
-
-    void readbuff(AsynchIO&, AsynchIOBufferBase*);
-    void writebuff(AsynchIO&);
-    void writeDataBlock(const framing::AMQDataBlock& data);
-    void eof(AsynchIO&);
-    void disconnected(AsynchIO&);
-
-    void connect(const std::string& host, const std::string& port);
-    void connected(const sys::Socket&);
-    void start(sys::AsynchIO* aio_);
-    void initAmqp();
-    void connectFailed(const std::string& msg);
-
-    void close();
-    void handle(framing::AMQFrame& frame);
-    void abort();
-    void connectAborted();
-
-    void setInputHandler(framing::InputHandler* handler);
-    void setShutdownHandler(sys::ShutdownHandler* handler);
-    const std::string& getIdentifier() const;
-    const SecuritySettings* getSecuritySettings();
-    void socketClosed(AsynchIO&, const Socket&);
-
-    size_t decode(const char* buffer, size_t size);
-    size_t encode(char* buffer, size_t size);
-    bool canEncode();
-
-public:
-    SslConnector(Poller::shared_ptr p, framing::ProtocolVersion pVersion,
-              const ConnectionSettings&,
-              ConnectionImpl*);
-};
 
 // Static constructor which registers connector here
 namespace {
-    Connector* create(Poller::shared_ptr p, framing::ProtocolVersion v, const ConnectionSettings& s, ConnectionImpl* c) {
-        return new SslConnector(p, v, s, c);
+    Connector* create(boost::shared_ptr<Poller> p, framing::ProtocolVersion v, const ConnectionSettings& s, ConnectionImpl* c) {
+        QPID_LOG(debug, "SslConnector created for " << v.toString());
+
+        if (s.sslCertName != "") {
+            QPID_LOG(debug, "ssl-cert-name = " << s.sslCertName);
+        }
+        return createSocketConnector(p, new SslSocket(s.sslCertName), v, s.maxFrameSize, c);
     }
 
     struct StaticInit {
@@ -144,272 +72,4 @@ namespace {
     } init;
 }
 
-SslConnector::SslConnector(Poller::shared_ptr p,
-                     ProtocolVersion ver,
-                     const ConnectionSettings& settings,
-                     ConnectionImpl* cimpl)
-    : maxFrameSize(settings.maxFrameSize),
-      lastEof(0),
-      currentSize(0),
-      bounds(cimpl),
-      version(ver),
-      initiated(false),
-      closed(true),
-      shutdownHandler(0),
-      input(0),
-      socket(new SslSocket(settings.sslCertName)),
-      connector(0),
-      aio(0),
-      poller(p),
-      codec(this)
-{
-    QPID_LOG(debug, "SslConnector created for " << version.toString());
-
-    if (settings.sslCertName != "") {
-        QPID_LOG(debug, "ssl-cert-name = " << settings.sslCertName);
-    }
-}
-
-SslConnector::~SslConnector() {
-    close();
-}
-
-void SslConnector::connect(const std::string& host, const std::string& port) {
-    Mutex::ScopedLock l(lock);
-    assert(closed);
-    connector = AsynchConnector::create(
-        *socket,
-        host, port,
-        boost::bind(&SslConnector::connected, this, _1),
-        boost::bind(&SslConnector::connectFailed, this, _3));
-    closed = false;
-
-    connector->start(poller);
-}
-
-void SslConnector::connected(const Socket&) {
-    connector = 0;
-    aio = AsynchIO::create(*socket,
-                           boost::bind(&SslConnector::readbuff, this, _1, _2),
-                           boost::bind(&SslConnector::eof, this, _1),
-                           boost::bind(&SslConnector::disconnected, this, _1),
-                           boost::bind(&SslConnector::socketClosed, this, _1, _2),
-                           0, // nobuffs
-                           boost::bind(&SslConnector::writebuff, this, _1));
-
-    start(aio);
-    initAmqp();
-    aio->start(poller);
-}
-
-void SslConnector::start(sys::AsynchIO* aio_) {
-    aio = aio_;
-
-    aio->createBuffers(maxFrameSize);
-
-    identifier = str(format("[%1%]") % socket->getFullAddress());
-}
-
-void SslConnector::initAmqp() {
-    ProtocolInitiation init(version);
-    writeDataBlock(init);
-}
-
-void SslConnector::connectFailed(const std::string& msg) {
-    connector = 0;
-    QPID_LOG(warning, "Connect failed: " << msg);
-    socket->close();
-    if (!closed)
-        closed = true;
-    if (shutdownHandler)
-        shutdownHandler->shutdown();
-}
-
-void SslConnector::close() {
-    Mutex::ScopedLock l(lock);
-    if (!closed) {
-        closed = true;
-        if (aio)
-            aio->queueWriteClose();
-    }
-}
-
-void SslConnector::socketClosed(AsynchIO&, const Socket&) {
-    if (aio)
-        aio->queueForDeletion();
-    if (shutdownHandler)
-        shutdownHandler->shutdown();
-}
-
-void SslConnector::connectAborted() {
-    connector->stop();
-    connectFailed("Connection timedout");
-}
-
-void SslConnector::abort() {
-    // Can't abort a closed connection
-    if (!closed) {
-        if (aio) {
-            // Established connection
-            aio->requestCallback(boost::bind(&SslConnector::disconnected, this, _1));
-        } else if (connector) {
-            // We're still connecting
-            connector->requestCallback(boost::bind(&SslConnector::connectAborted, this));
-        }
-    }
-}
-
-void SslConnector::setInputHandler(InputHandler* handler){
-    input = handler;
-}
-
-void SslConnector::setShutdownHandler(ShutdownHandler* handler){
-    shutdownHandler = handler;
-}
-
-const std::string& SslConnector::getIdentifier() const {
-    return identifier;
-}
-
-void SslConnector::handle(AMQFrame& frame) {
-    bool notifyWrite = false;
-    {
-    Mutex::ScopedLock l(lock);
-    frames.push_back(frame);
-    //only ask to write if this is the end of a frameset or if we
-    //already have a buffers worth of data
-    currentSize += frame.encodedSize();
-    if (frame.getEof()) {
-        lastEof = frames.size();
-        notifyWrite = true;
-    } else {
-        notifyWrite = (currentSize >= maxFrameSize);
-    }
-    /*
-      NOTE: Moving the following line into this mutex block
-            is a workaround for BZ 570168, in which the test
-            testConcurrentSenders causes a hang about 1.5%
-            of the time.  ( To see the hang much more frequently
-            leave this line out of the mutex block, and put a
-            small usleep just before it.)
-
-            TODO mgoulish - fix the underlying cause and then
-                            move this call back outside the mutex.
-    */
-    if (notifyWrite && !closed) aio->notifyPendingWrite();
-    }
-}
-
-void SslConnector::writebuff(AsynchIO& /*aio*/)
-{
-    // It's possible to be disconnected and be writable
-    if (closed)
-        return;
-
-    if (!codec->canEncode()) {
-        return;
-    }
-
-    AsynchIOBufferBase* buffer = aio->getQueuedBuffer();
-    if (buffer) {
-
-        size_t encoded = encode(buffer->bytes, buffer->byteCount);
-
-        buffer->dataStart = 0;
-        buffer->dataCount = encoded;
-        aio->queueWrite(buffer);
-    }
-}
-
-// Called in IO thread.
-bool SslConnector::canEncode()
-{
-    Mutex::ScopedLock l(lock);
-    //have at least one full frameset or a whole buffers worth of data
-    return lastEof || currentSize >= maxFrameSize;
-}
-
-// Called in IO thread.
-size_t SslConnector::encode(char* buffer, size_t size)
-{
-    framing::Buffer out(buffer, size);
-    size_t bytesWritten(0);
-    {
-        Mutex::ScopedLock l(lock);
-        while (!frames.empty() && out.available() >= frames.front().encodedSize() ) {
-            frames.front().encode(out);
-            QPID_LOG(trace, "SENT [" << identifier << "]: " << frames.front());
-            frames.pop_front();
-            if (lastEof) --lastEof;
-        }
-        bytesWritten = size - out.available();
-        currentSize -= bytesWritten;
-    }
-    if (bounds) bounds->reduce(bytesWritten);
-    return bytesWritten;
-}
-
-void SslConnector::readbuff(AsynchIO& aio, AsynchIOBufferBase* buff)
-{
-    int32_t decoded = codec->decode(buff->bytes+buff->dataStart, buff->dataCount);
-    // TODO: unreading needs to go away, and when we can cope
-    // with multiple sub-buffers in the general buffer scheme, it will
-    if (decoded < buff->dataCount) {
-        // Adjust buffer for used bytes and then "unread them"
-        buff->dataStart += decoded;
-        buff->dataCount -= decoded;
-        aio.unread(buff);
-    } else {
-        // Give whole buffer back to aio subsystem
-        aio.queueReadBuffer(buff);
-    }
-}
-
-size_t SslConnector::decode(const char* buffer, size_t size)
-{
-    framing::Buffer in(const_cast<char*>(buffer), size);
-    if (!initiated) {
-        framing::ProtocolInitiation protocolInit;
-        if (protocolInit.decode(in)) {
-            QPID_LOG(debug, "RECV [" << identifier << "]: INIT(" << protocolInit << ")");
-            if(!(protocolInit==version)){
-                throw Exception(QPID_MSG("Unsupported version: " << protocolInit
-                                         << " supported version " << version));
-            }
-        }
-        initiated = true;
-    }
-    AMQFrame frame;
-    while(frame.decode(in)){
-        QPID_LOG(trace, "RECV [" << identifier << "]: " << frame);
-        input->received(frame);
-    }
-    return size - in.available();
-}
-
-void SslConnector::writeDataBlock(const AMQDataBlock& data) {
-    AsynchIOBufferBase* buff = aio->getQueuedBuffer();
-    assert(buff);
-    framing::Buffer out(buff->bytes, buff->byteCount);
-    data.encode(out);
-    buff->dataCount = data.encodedSize();
-    aio->queueWrite(buff);
-}
-
-void SslConnector::eof(AsynchIO&) {
-    close();
-}
-
-void SslConnector::disconnected(AsynchIO&) {
-    close();
-    socketClosed(*aio, *socket);
-}
-
-const SecuritySettings* SslConnector::getSecuritySettings()
-{
-    securitySettings.ssf = socket->getKeyLen();
-    securitySettings.authid = "dummy";//set to non-empty string to enable external authentication
-    return &securitySettings;
-}
-
-}} // namespace qpid::client
+}}

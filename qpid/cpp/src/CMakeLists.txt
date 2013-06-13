@@ -1058,6 +1058,7 @@ set (qpidclient_SOURCES
      qpid/client/SessionBase_0_10Access.h
      qpid/client/ConnectionAccess.h
      qpid/client/SessionImpl.cpp
+     qpid/client/SocketConnector.cpp
      qpid/client/StateManager.cpp
      qpid/client/Subscription.cpp
      qpid/client/SubscriptionImpl.cpp

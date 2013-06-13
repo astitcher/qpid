@@ -19,7 +19,7 @@
  *
  */
 
-#include "qpid/client/TCPConnector.h"
+#include "qpid/client/SocketConnector.h"
 
 #include "config.h"
 #include "qpid/Msg.h"
