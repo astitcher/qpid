@@ -16,7 +16,7 @@
 # specific language governing permissions and limitations
 # under the License.
 #
-SUBDIRS = qmf-console messaging old_api
+SUBDIRS = qmf-console messaging
 
 MAKEDIST=.libs/Makefile
 
