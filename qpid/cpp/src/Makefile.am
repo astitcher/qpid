@@ -230,7 +230,6 @@ cmoduleexec_LTLIBRARIES =
 
 include ha.mk
 include qmf.mk
-include qmfc.mk
 if HAVE_XML
 include xml.mk
 endif

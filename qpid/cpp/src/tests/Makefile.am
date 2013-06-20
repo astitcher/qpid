@@ -110,7 +110,6 @@ unit_test_SOURCES= unit_test.cpp unit_test.h \
 	ConnectionOptions.h \
 	ManagementTest.cpp \
 	MessageReplayTracker.cpp \
-	ConsoleTest.cpp \
 	ProxyTest.cpp \
 	RetryList.cpp \
 	FrameDecoder.cpp \
