@@ -28,9 +28,9 @@ EXTRA_DIST = \
   cmake_uninstall.cmake.in \
   packaging/NSIS QPID_VERSION.txt bindings/CMakeLists.txt \
   include/qpid/swig_python_typemaps.i include/qpid/swig_ruby_typemaps.i include/qpid/swig_perl_typemaps.i \
-  include/qpid/qpid.i include/qmf/qmfengine.i include/qmf/qmf2.i
+  include/qpid/qpid.i include/qmf/qmf2.i
 
-SUBDIRS = managementgen etc src docs/api docs/man examples bindings/qmf bindings/qpid bindings/qmf2
+SUBDIRS = managementgen etc src docs/api docs/man examples bindings/qpid bindings/qmf2
 
 # Update libtool, if needed.
 libtool: $(LIBTOOL_DEPS)

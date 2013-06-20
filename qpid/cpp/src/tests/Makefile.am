@@ -410,6 +410,5 @@ CLEAN_LOCAL += sasl_config
 clean-local:
 	rm -rf $(CLEAN_LOCAL)
 
-include testagent.mk
 include brokermgmt.mk
 

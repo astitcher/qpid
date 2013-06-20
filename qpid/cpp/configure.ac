@@ -514,24 +514,12 @@ AC_SUBST([builddir_lib_suffix])
 AC_CONFIG_FILES([
   Makefile
   examples/Makefile
-  examples/old_api/Makefile
-  examples/old_api/direct/Makefile
-  examples/old_api/fanout/Makefile
-  examples/old_api/pub-sub/Makefile
-  examples/old_api/request-response/Makefile
-  examples/old_api/failover/Makefile
-  examples/old_api/xml-exchange/Makefile
   examples/qmf-console/Makefile
-  examples/old_api/tradedemo/Makefile
   examples/messaging/Makefile
   bindings/qpid/Makefile
   bindings/qpid/ruby/Makefile
   bindings/qpid/python/Makefile
   bindings/qpid/dotnet/Makefile
-  bindings/qmf/Makefile
-  bindings/qmf/ruby/Makefile
-  bindings/qmf/python/Makefile
-  bindings/qmf/tests/Makefile
   bindings/qmf2/Makefile
   bindings/qmf2/ruby/Makefile
   bindings/qmf2/python/Makefile

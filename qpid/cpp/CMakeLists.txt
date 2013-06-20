@@ -68,8 +68,7 @@ set (QPIDD_CONF_FILE ${QPIDD_CONF_PATH} CACHE STRING
      "Name of the Qpid broker configuration file")
 
 install(FILES  LICENSE NOTICE  DESTINATION ${QPID_INSTALL_DOCDIR})
-install(FILES  include/qmf/qmfengine.i
-               include/qmf/qmf2.i
+install(FILES  include/qmf/qmf2.i
         DESTINATION ${QPID_INSTALL_INCLUDEDIR}/qmf)
 
 if (WIN32)

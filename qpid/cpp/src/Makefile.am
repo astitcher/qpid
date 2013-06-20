@@ -1094,7 +1094,6 @@ nobase_include_HEADERS +=			\
   ../include/qpid/types/Variant.h		\
   ../include/qpid/types/ImportExport.h          \
   ../include/qpid/qpid.i                        \
-  ../include/qmf/qmfengine.i                    \
   ../include/qmf/qmf2.i
 
 # Create the default data directory
