@@ -60,12 +60,12 @@
    //
    // Non-Windows (Linux, etc.) definitions:
    //
-#  define QPID_EXPORT
+#  define QPID_EXPORT __attribute ((visibility ("default")))
 #  define QPID_IMPORT
-#  define QPID_CLASS_EXPORT
-#  define QPID_CLASS_IMPORT
-#  define QPID_INLINE_EXPORT
-#  define QPID_INLINE_IMPORT
+#  define QPID_CLASS_EXPORT QPID_EXPORT
+#  define QPID_CLASS_IMPORT QPID_IMPORT
+#  define QPID_INLINE_EXPORT QPID_EXPORT
+#  define QPID_INLINE_IMPORT QPID_IMPORT
 #endif
 
 #endif  /*!QPID_IMPORTEXPORT_H*/
