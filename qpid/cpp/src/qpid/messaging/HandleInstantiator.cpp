@@ -26,39 +26,9 @@
 namespace qpid {
 namespace messaging {
 
-using namespace qpid::types;
+template class Handle<ConnectionImpl>;
+template class Handle<ReceiverImpl>;
+template class Handle<SenderImpl>;
+template class Handle<SessionImpl>;
 
-void HandleInstantiatorDoNotCall(void)
-{
-    // This function exists to instantiate various template Handle
-    //  bool functions. The instances are then available to  
-    //  the qpidmessaging DLL and subsequently exported.
-    // This function must not be exported nor called called.
-    // For further information refer to 
-    //  https://issues.apache.org/jira/browse/QPID-2926
-
-    Connection connection;
-    if (connection.isValid()) connection.close();
-    if (connection.isNull() ) connection.close();
-    if (connection          ) connection.close();
-    if (!connection         ) connection.close();
-
-    Receiver receiver;
-    if (receiver.isValid()) receiver.close();
-    if (receiver.isNull() ) receiver.close();
-    if (receiver          ) receiver.close();
-    if (!receiver         ) receiver.close();
-
-    Sender sender;
-    if (sender.isValid()) sender.close();
-    if (sender.isNull() ) sender.close();
-    if (sender          ) sender.close();
-    if (!sender         ) sender.close();
-
-    Session session;
-    if (session.isValid()) session.close();
-    if (session.isNull() ) session.close();
-    if (session          ) session.close();
-    if (!session         ) session.close();
-}
 }} // namespace qpid::messaging
