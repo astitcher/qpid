@@ -1,0 +1,334 @@
+qpid::messaging
+===============
+Address::Address();
+Address::Address(const std::string& address);
+Address::Address(const std::string& name, const std::string& subject,
+                        const qpid::types::Variant::Map& options, const std::string& type);
+Address::Address(const Address& address);
+Address::~Address();
+Address::operator=(const Address&);
+Address::getName() const;
+Address::setName(const std::string&);
+Address::getSubject() const;
+Address::setSubject(const std::string&);
+Address::getOptions() const;
+Address::getOptions();
+Address::setOptions(const qpid::types::Variant::Map&);
+
+Address::getType() const;
+Address::setType(const std::string&);
+
+Address::str() const;
+Address::operator bool() const;
+Address::operator !() const;
+
+operator<<(std::ostream& out, const Address& address);
+
+Connection::Connection(ConnectionImpl* impl);
+Connection::Connection(const Connection&);
+Connection::Connection();
+Connection::Connection(const std::string& url, const qpid::types::Variant::Map& options);
+Connection::Connection(const std::string& url, const std::string& options);
+Connection::~Connection();
+Connection::operator=(const Connection&);
+Connection::setOption(const std::string& name, const qpid::types::Variant& value);
+Connection::open();
+Connection::isOpen();
+Connection::isOpen() const;
+Connection::close();
+Connection::createTransactionalSession(const std::string& name);
+Connection::createSession(const std::string& name);
+
+Connection::getSession(const std::string& name) const;
+Connection::getAuthenticatedUsername();
+
+Duration::Duration(uint64_t milliseconds);
+Duration::getMilliseconds() const;
+Duration::FOREVER;
+Duration::IMMEDIATE;
+Duration::SECOND;
+Duration::MINUTE;
+
+operator*(const Duration& duration, uint64_t multiplier);
+operator*(uint64_t multiplier, const Duration& duration);
+operator==(const Duration& a, const Duration& b);
+operator!=(const Duration& a, const Duration& b);
+
+FailoverUpdates::FailoverUpdates(Connection& connection);
+FailoverUpdates::~FailoverUpdates();
+
+Message::Message(const std::string& bytes);
+Message::Message(const char*, size_t);
+Message::Message(const Message&);
+Message::~Message();
+
+Message::operator=(const Message&);
+
+Message::setReplyTo(const Address&);
+Message::getReplyTo() const;
+
+Message::setSubject(const std::string&);
+Message::getSubject() const;
+
+Message::setContentType(const std::string&);
+Message::getContentType() const;
+Message::setMessageId(const std::string&);
+Message::getMessageId() const;
+Message::setUserId(const std::string&);
+Message::getUserId() const;
+Message::setCorrelationId(const std::string&);
+Message::getCorrelationId() const;
+Message::setPriority(uint8_t);
+Message::getPriority() const;
+Message::setTtl(Duration ttl);
+Message::getTtl() const;
+Message::setDurable(bool durable);
+Message::getDurable() const;
+Message::getRedelivered() const;
+Message::setRedelivered(bool);
+Message::getProperties() const;
+Message::getProperties();
+Message::setContent(const std::string&);
+Message::setContent(const char* chars, size_t count);
+Message::getContent() const;
+Message::getContentPtr() const;
+Message::getContentSize() const;
+Message::setProperty(const std::string&, const qpid::types::Variant&);
+
+// Shouldn't this inherit from MessagingException? (would change ABI though still be caught by Exception?)
+EncodingException::EncodingException(const std::string& msg);
+
+decode(const Message& message, qpid::types::Variant::Map& map, const std::string& encoding);
+decode(const Message& message, qpid::types::Variant::List& list, const std::string& encoding);
+encode(const qpid::types::Variant::Map& map, Message& message, const std::string& encoding);
+encode(const qpid::types::Variant::List& list, Message& message, const std::string& encoding);
+
+Receiver::Receiver(ReceiverImpl*);
+Receiver::Receiver(const Receiver&);
+Receiver::~Receiver();
+Receiver::operator=(const Receiver&);
+Receiver::get(Message& message, Duration timeout);
+Receiver::get(Duration timeout);
+Receiver::fetch(Message& message, Duration timeout);
+Receiver::fetch(Duration timeout);
+Receiver::setCapacity(uint32_t);
+Receiver::getCapacity();
+Receiver::getAvailable();
+Receiver::getUnsettled();
+Receiver::close();
+Receiver::isClosed() const;
+Receiver::getName() const;
+Receiver::getSession() const;
+Receiver::getAddress() const;
+
+Sender::Sender(SenderImpl* impl);
+Sender::Sender(const Sender&);
+Sender::~Sender();
+Sender::operator=(const Sender&);
+
+Sender::send(const Message& message, bool sync);
+Sender::close();
+Sender::setCapacity(uint32_t);
+Sender::getCapacity();
+Sender::getUnsettled();
+Sender::getAvailable();
+Sender::getName() const;
+Sender::getSession() const;
+Sender::getAddress() const;
+
+Session::Session(SessionImpl* impl);
+Session::Session(const Session&);
+Session::~Session();
+Session::operator=(const Session&);
+
+Session::close();
+Session::commit();
+Session::rollback();
+Session::acknowledge(bool sync);
+Session::acknowledge(Message&, bool sync);
+Session::acknowledgeUpTo(Message&, bool sync);
+Session::reject(Message&);
+Session::release(Message&);
+Session::sync(bool block);
+Session::getReceivable();
+Session::getUnsettledAcks();
+Session::nextReceiver(Receiver&, Duration timeout);
+Session::nextReceiver(Duration timeout);
+Session::createSender(const Address& address);
+Session::createSender(const std::string& address);
+Session::createReceiver(const Address& address);
+Session::createReceiver(const std::string& address);
+Session::getSender(const std::string& name) const;
+Session::getReceiver(const std::string& name) const;
+Session::getConnection() const;
+Session::hasError();
+Session::checkError();
+
+MessagingException::MessagingException(const std::string& msg);
+MessagingException::~MessagingException();
+MessagingException::detail;
+
+// Missing destructors in definitions?
+InvalidOptionString::InvalidOptionString(const std::string& msg);
+KeyError::KeyError(const std::string&);
+LinkError::LinkError(const std::string&);
+AddressError::AddressError(const std::string&);
+ResolutionError::ResolutionError(const std::string& msg);
+AssertionFailed::AssertionFailed(const std::string& msg);
+NotFound::NotFound(const std::string& msg);
+MalformedAddress::MalformedAddress(const std::string& msg);
+ReceiverError::ReceiverError(const std::string&);
+FetchError::FetchError(const std::string&);
+NoMessageAvailable::NoMessageAvailable();
+SenderError::SenderError(const std::string&);
+SendError::SendError(const std::string&);
+TargetCapacityExceeded::TargetCapacityExceeded(const std::string&);
+SessionError::SessionError(const std::string&);
+TransactionError::TransactionError(const std::string&);
+TransactionAborted::TransactionAborted(const std::string&);
+UnauthorizedAccess::UnauthorizedAccess(const std::string&);
+ConnectionError::ConnectionError(const std::string&);
+TransportFailure::TransportFailure(const std::string&);
+
+template class Handle<ConnectionImpl>;
+template class Handle<ReceiverImpl>;
+template class Handle<SenderImpl>;
+template class Handle<SessionImpl>;
+    isValid();
+    isNull() const;
+    operator bool() const;
+    operator !() const;
+    swap(Handle<T>& h);
+
+qpid::types
+===========
+Exception::Exception(const std::string& message);
+Exception::~Exception();
+Exception::what() const;
+
+Uuid::SIZE;
+Uuid::Uuid(bool unique);
+Uuid::Uuid(const Uuid&);
+Uuid::operator=(const Uuid&);
+Uuid::Uuid(const unsigned char* data16);
+Uuid::generate();
+Uuid::clear();
+Uuid::isNull() const;
+Uuid::operator bool() const;
+Uuid::operator!() const;
+Uuid::str() const;
+
+Uuid::size() const;
+Uuid::data() const;
+
+Uuid::hash() const;
+Uuid::Hasher::operator()(const Uuid& u) const;
+
+operator==(const Uuid&, const Uuid&);
+operator!=(const Uuid&, const Uuid&);
+operator<(const Uuid&, const Uuid&);
+operator>(const Uuid&, const Uuid&);
+operator<=(const Uuid&, const Uuid&);
+operator>=(const Uuid&, const Uuid&);
+operator<<(std::ostream&, Uuid);
+operator>>(std::istream&, Uuid&);
+
+InvalidConversion::InvalidConversion(const std::string& msg);
+InvalidConversion::~InvalidConversion();
+
+getTypeName(VariantType type);
+isIntegerType(VariantType type);
+
+Variant::Variant();
+Variant::Variant(bool);
+Variant::Variant(uint8_t);
+Variant::Variant(uint16_t);
+Variant::Variant(uint32_t);
+Variant::Variant(uint64_t);
+Variant::Variant(int8_t);
+Variant::Variant(int16_t);
+Variant::Variant(int32_t);
+Variant::Variant(int64_t);
+Variant::Variant(float);
+Variant::Variant(double);
+Variant::Variant(const std::string&);
+Variant::Variant(const char*);
+Variant::Variant(const Map&);
+Variant::Variant(const List&);
+Variant::Variant(const Variant&);
+Variant::Variant(const Uuid&);
+
+Variant::~Variant();
+
+Variant::getType() const;
+Variant::isVoid() const;
+
+Variant::operator=(bool);
+Variant::operator=(uint8_t);
+Variant::operator=(uint16_t);
+Variant::operator=(uint32_t);
+Variant::operator=(uint64_t);
+Variant::operator=(int8_t);
+Variant::operator=(int16_t);
+Variant::operator=(int32_t);
+Variant::operator=(int64_t);
+Variant::operator=(float);
+Variant::operator=(double);
+Variant::operator=(const std::string&);
+Variant::operator=(const char*);
+Variant::operator=(const Map&);
+Variant::operator=(const List&);
+Variant::operator=(const Variant&);
+Variant::operator=(const Uuid&);
+
+Variant::parse(const std::string&);
+
+Variant::asBool() const;
+Variant::asUint8() const;
+Variant::asUint16() const;
+Variant::asUint32() const;
+Variant::asUint64() const;
+Variant::asInt8() const;
+Variant::asInt16() const;
+Variant::asInt32() const;
+Variant::asInt64() const;
+Variant::asFloat() const;
+Variant::asDouble() const;
+Variant::asString() const;
+Variant::asUuid() const;
+
+Variant::operator bool() const;
+Variant::operator uint8_t() const;
+Variant::operator uint16_t() const;
+Variant::operator uint32_t() const;
+Variant::operator uint64_t() const;
+Variant::operator int8_t() const;
+Variant::operator int16_t() const;
+Variant::operator int32_t() const;
+Variant::operator int64_t() const;
+Variant::operator float() const;
+Variant::operator double() const;
+Variant::operator std::string() const;
+Variant::operator Uuid() const;
+
+Variant::asMap() const;
+Variant::asMap();
+Variant::asList() const;
+Variant::asList();
+
+Variant::getString() const;
+Variant::getString();
+
+Variant::setEncoding(const std::string&);
+Variant::getEncoding() const;
+
+Variant::isEqualTo(const Variant& a) const;
+
+Variant::reset();
+
+operator<<(std::ostream& out, const Variant& value);
+operator<<(std::ostream& out, const Variant::Map& map);
+operator<<(std::ostream& out, const Variant::List& list);
+operator==(const Variant& a, const Variant& b);
+operator!=(const Variant& a, const Variant& b);
+    
