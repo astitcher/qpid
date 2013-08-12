@@ -1,0 +1,9 @@
+{
+    global:
+        extern "C++" {
+            typeinfo*qpid::*;
+            vtable*qpid::*;
+            qpid::*
+        };
+    local: *;
+};
