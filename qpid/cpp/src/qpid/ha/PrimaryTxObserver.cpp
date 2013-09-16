@@ -95,7 +95,7 @@ PrimaryTxObserver::PrimaryTxObserver(
 ) :
     state(SENDING),
     primary(p), haBroker(hb), broker(hb.getBroker()),
-    replicationTest(hb.getSettings().replicateDefault.get()),
+    replicationTest(Enum<ReplicateLevel>(hb.getSettings().replicateDefault).get()),
     txBuffer(tx),
     id(true),
     exchangeName(TRANSACTION_REPLICATOR_PREFIX+id.str()),

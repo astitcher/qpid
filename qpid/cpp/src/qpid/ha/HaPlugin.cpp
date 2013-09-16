@@ -18,7 +18,6 @@
 #include "HaBroker.h"
 #include "Settings.h"
 #include "qpid/Plugin.h"
-#include "qpid/Options.h"
 #include "qpid/broker/Broker.h"
 #include <boost/bind.hpp>
 

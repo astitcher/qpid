@@ -177,7 +177,7 @@ qpid::log::SinkOptions& SinkOptions::operator=(const qpid::log::SinkOptions& rhs
         logToSyslog = prhs->logToSyslog;
         logFile = prhs->logFile;
         syslogName = prhs->syslogName;
-        syslogFacility.value = prhs->syslogFacility.value;
+        syslogFacility = prhs->syslogFacility;
     }
     return *this;
 }

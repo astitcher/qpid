@@ -117,7 +117,7 @@ void HaBroker::initialize() {
         throw Exception("Cannot start HA: management is disabled");
     _qmf::Package  packageInit(ma);
     mgmtObject = _qmf::HaBroker::shared_ptr(new _qmf::HaBroker(ma, this, "ha-broker"));
-    mgmtObject->set_replicateDefault(settings.replicateDefault.str());
+    mgmtObject->set_replicateDefault(Enum<ReplicateLevel>(settings.replicateDefault).str());
     mgmtObject->set_systemId(systemId);
     ma->addObject(mgmtObject);
     membership.setMgmtObject(mgmtObject);

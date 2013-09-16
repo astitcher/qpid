@@ -23,6 +23,7 @@
  */
 
 #include "types.h"
+#include "qpid/Options.h"
 #include "qpid/sys/Time.h"
 #include "qpid/sys/IntegerTypes.h"
 #include <string>
@@ -45,7 +46,7 @@ class Settings
     bool queueReplication;      // True if enabled.
     std::string publicUrl;
     std::string brokerUrl;
-    Enum<ReplicateLevel> replicateDefault;
+    CustomOptionType<Enum<ReplicateLevel> > replicateDefault;
     std::string username, password, mechanism;
     sys::Duration backupTimeout;
 

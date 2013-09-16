@@ -99,7 +99,7 @@ struct Opts : public TestOptions {
     size_t qt;
     bool singleConnect;
     size_t iterations;
-    Mode mode;
+    CustomOptionType<Mode> mode;
     bool summary;
     uint32_t intervalSub;
     uint32_t intervalPub;
@@ -170,7 +170,7 @@ struct Opts : public TestOptions {
 
     void parse(int argc, char** argv) {
         TestOptions::parse(argc, argv);
-        switch (mode) {
+        switch (Mode(mode)) {
           case SHARED:
             if (count % subs) {
                 count += subs - (count % subs);
@@ -276,7 +276,7 @@ struct Setup : public Client {
         queueInit(fqn("sub_ready"));
         queueInit(fqn("sub_done"));
         if (opts.iterations > 1) queueInit(fqn("sub_iteration"));
-        if (opts.mode==SHARED) {
+        if (Mode(opts.mode)==SHARED) {
             framing::FieldTable settings;//queue policy settings
             settings.setInt("qpid.max_count", opts.queueMaxCount);
             settings.setInt("qpid.max_size", opts.queueMaxSize);
@@ -656,7 +656,7 @@ struct SubscribeThread : public Client {
                     memcpy (&n, reinterpret_cast<const char*>(msg.getData().data() + offset),
                         sizeof(n));
                     if (opts.pubs == 1) {
-                        if (opts.subs == 1 || opts.mode == FANOUT) verify(n==expect, "==", expect, n);
+                        if (opts.subs == 1 || Mode(opts.mode) == FANOUT) verify(n==expect, "==", expect, n);
                         else verify(n>=expect, ">=", expect, n);
                         expect = n+1;
                     }
@@ -696,7 +696,7 @@ int main(int argc, char** argv) {
         opts.parse(argc, argv);
 
         string exchange;
-        switch (opts.mode) {
+        switch (Mode(opts.mode)) {
             case FANOUT: exchange="amq.fanout"; break;
             case TOPIC: exchange="amq.topic"; break;
             case SHARED: break;
@@ -723,7 +723,7 @@ int main(int argc, char** argv) {
             if (opts.subscribe) {
                 size_t n = singleProcess ? opts.subs : 1;
                 for (size_t j = 0; j < n; ++j)  {
-                    if (opts.mode==SHARED)
+                    if (Mode(opts.mode)==SHARED)
                         subs.push_back(new SubscribeThread(key.str()));
                     else
                         subs.push_back(new SubscribeThread(key.str(),exchange));

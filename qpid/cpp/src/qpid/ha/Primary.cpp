@@ -134,7 +134,7 @@ class PrimarySessionHandlerObserver : public broker::SessionHandlerObserver {
 Primary::Primary(HaBroker& hb, const BrokerInfo::Set& expect) :
     haBroker(hb), membership(hb.getMembership()),
     logPrefix("Primary: "), active(false),
-    replicationTest(hb.getSettings().replicateDefault.get()),
+    replicationTest(Enum<ReplicateLevel>(hb.getSettings().replicateDefault).get()),
     sessionHandlerObserver(new PrimarySessionHandlerObserver(logPrefix)),
     queueLimits(logPrefix, hb.getBroker().getQueues(), replicationTest)
 {

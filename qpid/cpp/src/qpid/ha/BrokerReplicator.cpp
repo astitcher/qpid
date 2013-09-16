@@ -753,7 +753,7 @@ const string REPLICATE_DEFAULT="replicateDefault";
 void BrokerReplicator::doResponseHaBroker(Variant::Map& values) {
     try {
         QPID_LOG(debug, logPrefix << "HA Broker response: " << values);
-        ReplicateLevel mine = haBroker.getSettings().replicateDefault.get();
+        ReplicateLevel mine = Enum<ReplicateLevel>(haBroker.getSettings().replicateDefault).get();
         ReplicateLevel primary = replicationTest.getLevel(values[REPLICATE_DEFAULT].asString());
         if (mine != primary)
             throw Exception(QPID_MSG("Replicate default on backup (" << mine

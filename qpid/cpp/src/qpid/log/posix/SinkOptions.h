@@ -56,7 +56,7 @@ struct SinkOptions : public qpid::log::SinkOptions {
     bool logToSyslog;
     std::string logFile;
     std::string syslogName;
-    SyslogFacility syslogFacility;
+    CustomOptionType<SyslogFacility> syslogFacility;
 };
 
 }}} // namespace qpid::log::posix
