@@ -1054,6 +1054,7 @@ set (qpidmessaging_SOURCES
      qpid/messaging/Duration.cpp
      qpid/messaging/exceptions.cpp
      qpid/messaging/FailoverUpdates.cpp
+     qpid/messaging/Logger.cpp
      qpid/messaging/Message.cpp
      qpid/messaging/Receiver.cpp
      qpid/messaging/Session.cpp
