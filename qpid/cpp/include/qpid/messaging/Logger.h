@@ -24,8 +24,18 @@
 
 #include "qpid/messaging/ImportExport.h"
 
+#include <string>
+
 namespace qpid {
 namespace messaging {
+/**
+ * Interface class to allow redirection of log output
+ */
+class QPID_MESSAGING_CLASS_EXTERN LoggerOutput
+{
+public:
+    virtual void log(const std::string& message) = 0;
+}
 
 /**
  * A utility class to allow the application to control the logging
@@ -34,7 +44,15 @@ namespace messaging {
 class QPID_MESSAGING_CLASS_EXTERN Logger
 {
 public:
+    /**
+     * 
+     */
     QPID_MESSAGING_EXTERN static void configure(int argc, char* argv[]);
+
+    /**
+     * 
+     */
+    QPID_MESSAGING_EXTERN static void setOutput(const LoggerOutput& output);
 
 private:
     //This class has only one instance so no need to copy
