@@ -29,12 +29,19 @@
 namespace qpid {
 namespace messaging {
 /**
+    * These log levels need to be kept in sync with the log levels
+    * defined internally in qpid::log (but I don't think they are likely
+    * to change anyway
+    */
+enum Level { trace, debug, info, notice, warning, error, critical };
+
+    /**
  * Interface class to allow redirection of log output
  */
 class QPID_MESSAGING_CLASS_EXTERN LoggerOutput
 {
 public:
-    virtual void log(const std::string& message) = 0;
+    virtual void log(Level level, const char* file, int line, const char* function, const std::string& message) = 0;
 };
 
 /**
@@ -45,14 +52,19 @@ class QPID_MESSAGING_CLASS_EXTERN Logger
 {
 public:
     /**
-     * 
+     *
      */
     QPID_MESSAGING_EXTERN static void configure(int argc, char* argv[]);
 
     /**
-     * 
+     *
      */
     QPID_MESSAGING_EXTERN static void setOutput(LoggerOutput& output);
+
+    /**
+     *
+     */
+    QPID_MESSAGING_EXTERN static void log(Level level, const char* file, int line, const char* function, const std::string& message);
 
 private:
     //This class has only one instance so no need to copy
