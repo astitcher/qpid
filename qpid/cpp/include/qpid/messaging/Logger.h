@@ -35,7 +35,7 @@ class QPID_MESSAGING_CLASS_EXTERN LoggerOutput
 {
 public:
     virtual void log(const std::string& message) = 0;
-}
+};
 
 /**
  * A utility class to allow the application to control the logging
@@ -52,7 +52,7 @@ public:
     /**
      * 
      */
-    QPID_MESSAGING_EXTERN static void setOutput(const LoggerOutput& output);
+    QPID_MESSAGING_EXTERN static void setOutput(LoggerOutput& output);
 
 private:
     //This class has only one instance so no need to copy

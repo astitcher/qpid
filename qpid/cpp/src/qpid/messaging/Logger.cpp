@@ -26,6 +26,20 @@
 namespace qpid {
 namespace messaging {
 
+// Proxy class to call the users output class/routine
+class ProxyOutput : public qpid::log::Logger::Output {
+    LoggerOutput& output;
+
+    void log(const qpid::log::Statement&, const std::string& message) {
+        output.log(message);
+    }
+
+public:
+    ProxyOutput(LoggerOutput& o) :
+        output(o)
+    {}
+};
+
 inline qpid::log::Logger& logger() {
     static qpid::log::Logger& theLogger=qpid::log::Logger::instance();
     return theLogger;
@@ -36,6 +50,11 @@ void Logger::configure(int argc, char* argv[])
     qpid::log::Options options(argc > 0 ? argv[0] : "");
     options.parse(argc, argv);
     logger().configure(options);
+}
+
+void Logger::setOutput(LoggerOutput& o)
+{
+    logger().output(std::auto_ptr<qpid::log::Logger::Output>(new ProxyOutput(o)));
 }
 
 }} // namespace qpid::messaging
