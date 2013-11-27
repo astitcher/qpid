@@ -54,7 +54,7 @@ public:
     /**
      *
      */
-    QPID_MESSAGING_EXTERN static void configure(int argc, char* argv[]);
+    QPID_MESSAGING_EXTERN static void configure(int argc, char* argv[], const std::string& prefix=std::string());
 
     /**
      *

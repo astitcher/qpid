@@ -51,8 +51,11 @@ inline qpid::log::Logger& logger() {
     return theLogger;
 }
 
-void Logger::configure(int argc, char* argv[])
+void Logger::configure(int argc, char* argv[], const string& prefix)
 {
+    bool logToStdout;
+    bool logToStderr;
+    string logFile;
     std::vector<std::string> selectors;
     std::vector<std::string> deselectors;
     bool time, level, thread, source, function, hiresTs;
@@ -70,9 +73,10 @@ void Logger::configure(int argc, char* argv[])
         categories << " " << qpid::log::CategoryTraits::name(qpid::log::Category(i));
 
 
+    string fullPrefix = prefix.empty() ? prefix : prefix+"-";
     qpid::Options myOptions;
     myOptions.addOptions()
-    ("log-enable", optValue(selectors, "RULE"),
+    ((prefix+"log-enable").c_str(), optValue(selectors, "RULE"),
      ("Enables logging for selected levels and components. "
      "RULE is in the form 'LEVEL[+-][:PATTERN]'\n"
      "LEVEL is one of: \n\t "+levels.str()+"\n"
@@ -87,7 +91,7 @@ void Logger::configure(int argc, char* argv[])
      "\t'--log-enable debug:framing'\n"
      "logs debug messages from all functions with 'framing' in the namespace or function name.\n"
      "This option can be used multiple times").c_str())
-    ("log-disable", optValue(deselectors, "RULE"),
+    ((prefix+"log-disable").c_str(), optValue(deselectors, "RULE"),
      ("Disables logging for selected levels and components. "
      "RULE is in the form 'LEVEL[+-][:PATTERN]'\n"
      "LEVEL is one of: \n\t "+levels.str()+"\n"
@@ -102,17 +106,22 @@ void Logger::configure(int argc, char* argv[])
      "\t'--log-disable debug-:qmf::'\n"
      "disables logging debug and trace messages from all functions with 'qmf::' in the namespace.\n"
      "This option can be used multiple times").c_str())
-    ("log-time", optValue(time, "yes|no"), "Include time in log messages")
-    ("log-level", optValue(level,"yes|no"), "Include severity level in log messages")
-    ("log-source", optValue(source,"yes|no"), "Include source file:line in log messages")
-    ("log-thread", optValue(thread,"yes|no"), "Include thread ID in log messages")
-    ("log-function", optValue(function,"yes|no"), "Include function signature in log messages")
-    ("log-hires-timestamp", optValue(hiresTs,"yes|no"), "Use hi-resolution timestamps in log messages")
+    ((prefix+"log-time").c_str(), optValue(time, "yes|no"), "Include time in log messages")
+    ((prefix+"log-level").c_str(), optValue(level,"yes|no"), "Include severity level in log messages")
+    ((prefix+"log-source").c_str(), optValue(source,"yes|no"), "Include source file:line in log messages")
+    ((prefix+"log-thread").c_str(), optValue(thread,"yes|no"), "Include thread ID in log messages")
+    ((prefix+"log-function").c_str(), optValue(function,"yes|no"), "Include function signature in log messages")
+    ((prefix+"log-hires-timestamp").c_str(), optValue(hiresTs,"yes|no"), "Use hi-resolution timestamps in log messages")
+    ((prefix+"log-to-stderr").c_str(), optValue(logToStderr, "yes|no"), "Send logging output to stderr")
+    ((prefix+"log-to-stdout").c_str(), optValue(logToStdout, "yes|no"), "Send logging output to stdout")
+    ((prefix+"log-to-file").c_str(), optValue(logFile, "FILE"), "Send log output to FILE.")
     ;
 
     myOptions.parse(argc, argv, std::string(), true);
-    logger().format(myOptions);
-    logger().select(Selector(myOptions));
+
+    qpid::log::Options logOptions;
+    logger().format(logOptions);
+    logger().select(qpid::log::Selector(logOptions));
 }
 
 void Logger::setOutput(LoggerOutput& o)
