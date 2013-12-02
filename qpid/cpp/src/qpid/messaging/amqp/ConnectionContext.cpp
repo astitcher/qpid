@@ -34,6 +34,7 @@
 #include "qpid/framing/ProtocolInitiation.h"
 #include "qpid/framing/Uuid.h"
 #include "qpid/log/Statement.h"
+#include "qpid/sys/SecurityLayer.h"
 #include "qpid/sys/SystemInfo.h"
 #include "qpid/sys/Time.h"
 #include <vector>
@@ -53,7 +54,8 @@ ConnectionContext::ConnectionContext(const std::string& url, const qpid::types::
       writeHeader(false),
       readHeader(false),
       haveOutput(false),
-      state(DISCONNECTED)
+      state(DISCONNECTED),
+      codecAdapter(*this)
 {
     urls.insert(urls.begin(), url);
     if (pn_transport_bind(engine, connection)) {
@@ -140,6 +142,11 @@ void ConnectionContext::close()
 
 bool ConnectionContext::fetch(boost::shared_ptr<SessionContext> ssn, boost::shared_ptr<ReceiverContext> lnk, qpid::messaging::Message& message, qpid::messaging::Duration timeout)
 {
+    /**
+     * For fetch() on a receiver with zero capacity, need to reissue the
+     * credit on reconnect, so track the fetches in progress.
+     */
+    qpid::sys::AtomicCount::ScopedIncrement track(lnk->fetching);
     {
         qpid::sys::ScopedLock<qpid::sys::Monitor> l(lock);
         checkClosed(ssn, lnk);
@@ -535,7 +542,11 @@ void ConnectionContext::restartSession(boost::shared_ptr<SessionContext> s)
     }
     for (SessionContext::ReceiverMap::iterator i = s->receivers.begin(); i != s->receivers.end(); ++i) {
         QPID_LOG(debug, id << " reattaching receiver " << i->first);
-        attach(s, i->second->receiver, i->second->capacity);
+        if (i->second->capacity) {
+            attach(s, i->second->receiver, i->second->capacity);
+        } else {
+            attach(s, i->second->receiver, (uint32_t) i->second->fetching);
+        }
         i->second->verify();
         QPID_LOG(debug, id << " receiver " << i->first << " reattached");
     }
@@ -986,6 +997,25 @@ bool ConnectionContext::restartSessions()
         QPID_LOG(debug, "Connection Failed to re-initialize sessions: " << e.what());
         return false;
     }
+}
+
+void ConnectionContext::initSecurityLayer(qpid::sys::SecurityLayer& s)
+{
+    s.init(&codecAdapter);
+}
+
+ConnectionContext::CodecAdapter::CodecAdapter(ConnectionContext& c) : context(c) {}
+std::size_t ConnectionContext::CodecAdapter::decode(const char* buffer, std::size_t size)
+{
+    return context.decodePlain(buffer, size);
+}
+std::size_t ConnectionContext::CodecAdapter::encode(char* buffer, std::size_t size)
+{
+    return context.encodePlain(buffer, size);
+}
+bool ConnectionContext::CodecAdapter::canEncode()
+{
+    return context.canEncodePlain();
 }
 
 
