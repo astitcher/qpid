@@ -62,27 +62,16 @@ void Logger::configure(int argc, char* argv[], const string& prefix)
 
     selectors.push_back("notice+");
 
-    ostringstream levels;
-    levels << qpid::log::LevelTraits::name(qpid::log::Level(0));
-    for (int i = 1; i < qpid::log::LevelTraits::COUNT; ++i)
-        levels << " " << qpid::log::LevelTraits::name(qpid::log::Level(i));
-
-    ostringstream categories;
-    categories << qpid::log::CategoryTraits::name(qpid::log::Category(0));
-    for (int i = 1; i < qpid::log::CategoryTraits::COUNT; ++i)
-        categories << " " << qpid::log::CategoryTraits::name(qpid::log::Category(i));
-
-
     string fullPrefix = prefix.empty() ? prefix : prefix+"-";
     qpid::Options myOptions;
     myOptions.addOptions()
     ((prefix+"log-enable").c_str(), optValue(selectors, "RULE"),
      ("Enables logging for selected levels and components. "
      "RULE is in the form 'LEVEL[+-][:PATTERN]'\n"
-     "LEVEL is one of: \n\t "+levels.str()+"\n"
+     "LEVEL is one of: \n\t "+qpid::log::getLevels()+"\n"
      "PATTERN is a logging category name, or a namespace-qualified "
      "function name or name fragment. "
-     "Logging category names are: \n\t "+categories.str()+"\n"
+     "Logging category names are: \n\t "+qpid::log::getCategories()+"\n"
      "For example:\n"
      "\t'--log-enable warning+'\n"
      "logs all warning, error and critical messages.\n"
@@ -94,10 +83,10 @@ void Logger::configure(int argc, char* argv[], const string& prefix)
     ((prefix+"log-disable").c_str(), optValue(deselectors, "RULE"),
      ("Disables logging for selected levels and components. "
      "RULE is in the form 'LEVEL[+-][:PATTERN]'\n"
-     "LEVEL is one of: \n\t "+levels.str()+"\n"
+     "LEVEL is one of: \n\t "+qpid::log::getLevels()+"\n"
      "PATTERN is a logging category name, or a namespace-qualified "
      "function name or name fragment. "
-     "Logging category names are: \n\t "+categories.str()+"\n"
+     "Logging category names are: \n\t "+qpid::log::getCategories()+"\n"
      "For example:\n"
      "\t'--log-disable warning-'\n"
      "disables logging all warning, notice, info, debug, and trace messages.\n"

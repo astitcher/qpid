@@ -235,4 +235,5 @@ Category CategoryTraits::category(const char* name) {
 const char* CategoryTraits::name(Category c) {
     return catNames[c];
 }
+
 }} // namespace qpid::log
