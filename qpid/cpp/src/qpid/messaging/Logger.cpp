@@ -22,13 +22,11 @@
 #include "qpid/messaging/Logger.h"
 
 #include "qpid/log/Logger.h"
-#include "qpid/log/SinkOptions.h"
+#include "qpid/log/OstreamOutput.h"
 
-#include <sstream>
 #include <string>
 #include <vector>
 
-using std::ostringstream;
 using std::string;
 using std::vector;
 
@@ -123,21 +121,21 @@ void Logger::configure(int argc, char* argv[], const string& pre)
     logOptions.function = function;
     logOptions.hiresTs = hiresTs;
 
-    // Have to do something a bit more fiddly for the sink options
-    vector<const char*> sinkArgs;
-    sinkArgs.push_back("log-to-stderr"); sinkArgs.push_back(logToStderr? "true" : "false");
-    sinkArgs.push_back("log-to-stdout"); sinkArgs.push_back(logToStdout? "true" : "false");
-    if (!logFile.empty()) {sinkArgs.push_back("log-to-file"); sinkArgs.push_back(logFile.c_str());}
-    logOptions.sinkOptions->parse(sinkArgs.size(), &sinkArgs[0]);
-
+    logger().clear(); // Need to clear before configuring as it will have been initialised statically already
     logger().format(logOptions);
     logger().select(qpid::log::Selector(logOptions));
 
-    // Attach regular sinks to logger
-    logOptions.sinkOptions->setup(&logger());
+    // Have to set up the standard output sinks manually
+    if (logToStderr)
+        logger().output(std::auto_ptr<qpid::log::Logger::Output>
+                       (new qpid::log::OstreamOutput(std::clog)));
+    if (logToStdout)
+        logger().output(std::auto_ptr<qpid::log::Logger::Output>
+                       (new qpid::log::OstreamOutput(std::cout)));
 
-    //XXX Debug
-    myOptions.print(std::cerr);
+    if (logFile.length() > 0)
+        logger().output(std::auto_ptr<qpid::log::Logger::Output>
+                         (new qpid::log::OstreamOutput(logFile)));
 }
 
 void Logger::setOutput(LoggerOutput& o)
