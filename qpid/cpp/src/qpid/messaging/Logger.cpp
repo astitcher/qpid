@@ -22,12 +22,15 @@
 #include "qpid/messaging/Logger.h"
 
 #include "qpid/log/Logger.h"
+#include "qpid/log/SinkOptions.h"
 
 #include <sstream>
 #include <string>
+#include <vector>
 
 using std::ostringstream;
 using std::string;
+using std::vector;
 
 namespace qpid {
 namespace messaging {
@@ -51,7 +54,7 @@ inline qpid::log::Logger& logger() {
     return theLogger;
 }
 
-void Logger::configure(int argc, char* argv[], const string& prefix)
+void Logger::configure(int argc, char* argv[], const string& pre)
 {
     bool logToStdout;
     bool logToStderr;
@@ -62,7 +65,7 @@ void Logger::configure(int argc, char* argv[], const string& prefix)
 
     selectors.push_back("notice+");
 
-    string fullPrefix = prefix.empty() ? prefix : prefix+"-";
+    string prefix = pre.empty() ? pre : pre+"-";
     qpid::Options myOptions;
     myOptions.addOptions()
     ((prefix+"log-enable").c_str(), optValue(selectors, "RULE"),
@@ -106,11 +109,35 @@ void Logger::configure(int argc, char* argv[], const string& prefix)
     ((prefix+"log-to-file").c_str(), optValue(logFile, "FILE"), "Send log output to FILE.")
     ;
 
+    // Parse the command line not failing for unrecognised options
     myOptions.parse(argc, argv, std::string(), true);
 
+    // Set the logger options according to what we just parsed
     qpid::log::Options logOptions;
+    logOptions.selectors = selectors;
+    logOptions.deselectors = deselectors;
+    logOptions.time = time;
+    logOptions.level = level;
+    logOptions.thread = thread;
+    logOptions.source = source;
+    logOptions.function = function;
+    logOptions.hiresTs = hiresTs;
+
+    // Have to do something a bit more fiddly for the sink options
+    vector<const char*> sinkArgs;
+    sinkArgs.push_back("log-to-stderr"); sinkArgs.push_back(logToStderr? "true" : "false");
+    sinkArgs.push_back("log-to-stdout"); sinkArgs.push_back(logToStdout? "true" : "false");
+    if (!logFile.empty()) {sinkArgs.push_back("log-to-file"); sinkArgs.push_back(logFile.c_str());}
+    logOptions.sinkOptions->parse(sinkArgs.size(), &sinkArgs[0]);
+
     logger().format(logOptions);
     logger().select(qpid::log::Selector(logOptions));
+
+    // Attach regular sinks to logger
+    logOptions.sinkOptions->setup(&logger());
+
+    //XXX Debug
+    myOptions.print(std::cerr);
 }
 
 void Logger::setOutput(LoggerOutput& o)
@@ -130,4 +157,5 @@ void Logger::log(Level level, const char* file, int line, const char* function, 
     };
     logger().log(s, message);
 }
+
 }} // namespace qpid::messaging

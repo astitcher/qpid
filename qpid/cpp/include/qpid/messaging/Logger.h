@@ -29,13 +29,13 @@
 namespace qpid {
 namespace messaging {
 /**
-    * These log levels need to be kept in sync with the log levels
-    * defined internally in qpid::log (but I don't think they are likely
-    * to change anyway
-    */
+ * These log levels need to be kept in sync with the log levels
+ * defined internally in qpid::log (but I don't think they are likely
+ * to change anyway
+ */
 enum Level { trace, debug, info, notice, warning, error, critical };
 
-    /**
+/**
  * Interface class to allow redirection of log output
  */
 class QPID_MESSAGING_CLASS_EXTERN LoggerOutput
