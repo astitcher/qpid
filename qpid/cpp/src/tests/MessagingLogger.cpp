@@ -23,17 +23,33 @@
 #include <qpid/messaging/Logger.h>
 
 #include <iostream>
+#include <memory>
 #include <stdexcept>
+
+class MyLogger : public qpid::messaging::LoggerOutput {
+    std::ostream& outStream;
+
+    void log(qpid::messaging::Level /*level*/, const char* file, int line, const char* function, const std::string& message){
+        outStream << file << ": " << function << ":" << line << ": " << message;
+    }
+
+public:
+    MyLogger(std::ostream& os) :
+        outStream(os)
+    {}
+};
 
 int main(int argc, char* argv[]) {
     try {
         qpid::messaging::Logger::configure(argc, argv, "qpid");
+        MyLogger logger(std::cout);
+        qpid::messaging::Logger::setOutput(logger);
 
         using qpid::messaging::Connection;
         Connection c("localhost");
 
         c.open();
     } catch (std::exception& e) {
-        std::cerr << "Caught exception: " << e.what() << "\n";
+        qpid::messaging::Logger::log(qpid::messaging::critical, __FILE__, __LINE__, __FUNCTION__  , std::string("Caught exception: ") + e.what());
     }
 }

@@ -116,6 +116,7 @@ void Logger::configure(int argc, char* argv[], const string& pre)
     logOptions.deselectors = deselectors;
     logOptions.time = time;
     logOptions.level = level;
+    logOptions.category = false;
     logOptions.thread = thread;
     logOptions.source = source;
     logOptions.function = function;
