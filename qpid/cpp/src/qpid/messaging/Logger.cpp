@@ -24,6 +24,7 @@
 #include "qpid/log/Logger.h"
 #include "qpid/log/OstreamOutput.h"
 
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -50,6 +51,14 @@ public:
 inline qpid::log::Logger& logger() {
     static qpid::log::Logger& theLogger=qpid::log::Logger::instance();
     return theLogger;
+}
+namespace {
+    std::string loggerUsage;
+}
+
+std::string Logger::usage()
+{
+    return loggerUsage;
 }
 
 void Logger::configure(int argc, char* argv[], const string& pre)
@@ -106,6 +115,11 @@ void Logger::configure(int argc, char* argv[], const string& pre)
     ((prefix+"log-to-stdout").c_str(), optValue(logToStdout, "yes|no"), "Send logging output to stdout")
     ((prefix+"log-to-file").c_str(), optValue(logFile, "FILE"), "Send log output to FILE.")
     ;
+
+    std::ostringstream loggerSStream;
+    myOptions.print(loggerSStream);
+
+    loggerUsage=loggerSStream.str();
 
     // Parse the command line not failing for unrecognised options
     myOptions.parse(argc, argv, std::string(), true);

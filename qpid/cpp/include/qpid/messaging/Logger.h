@@ -57,6 +57,11 @@ public:
     QPID_MESSAGING_EXTERN static void configure(int argc, char* argv[], const std::string& prefix=std::string());
 
     /**
+     * 
+     */
+    QPID_MESSAGING_EXTERN static std::string usage();
+
+    /**
      *
      */
     QPID_MESSAGING_EXTERN static void setOutput(LoggerOutput& output);

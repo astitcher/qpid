@@ -26,11 +26,13 @@
 #include <memory>
 #include <stdexcept>
 
+#include <vector>
+
 class MyLogger : public qpid::messaging::LoggerOutput {
     std::ostream& outStream;
 
     void log(qpid::messaging::Level /*level*/, const char* file, int line, const char* function, const std::string& message){
-        outStream << file << ": " << function << ":" << line << ": " << message;
+        outStream << file << ":" << line << ":["<< function << "()]:"  << message;
     }
 
 public:
@@ -39,9 +41,25 @@ public:
     {}
 };
 
+std::string UsageOption("--help");
+
 int main(int argc, char* argv[]) {
+    std::vector<const char*> args(&argv[0], &argv[argc]);
+
+    bool showUsage = false;
+    for (int i=0; i<argc; ++i){
+        if ( UsageOption == args[i] ) showUsage = true;
+    }
+
     try {
         qpid::messaging::Logger::configure(argc, argv, "qpid");
+
+        if (showUsage) std::cerr << qpid::messaging::Logger::usage();
+    } catch (std::exception& e) {
+        std::cerr << "Caught exception: " << e.what() << "\n";
+    }
+
+    try {
         MyLogger logger(std::cout);
         qpid::messaging::Logger::setOutput(logger);
 
