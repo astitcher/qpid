@@ -53,13 +53,17 @@ int main(int argc, char* argv[]) {
 
     try {
         qpid::messaging::Logger::configure(argc, argv, "qpid");
-
-        if (showUsage) std::cerr << qpid::messaging::Logger::usage();
     } catch (std::exception& e) {
-        std::cerr << "Caught exception: " << e.what() << "\n";
+        std::cerr << "Caught exception configuring logger: " << e.what() << "\n";
+        showUsage = true;
     }
 
     try {
+        if (showUsage) {
+            std::cerr << qpid::messaging::Logger::usage();
+            return 0;
+        }
+
         MyLogger logger(std::cout);
         qpid::messaging::Logger::setOutput(logger);
 
