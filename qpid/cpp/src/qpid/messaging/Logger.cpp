@@ -52,6 +52,7 @@ inline qpid::log::Logger& logger() {
     static qpid::log::Logger& theLogger=qpid::log::Logger::instance();
     return theLogger;
 }
+
 namespace {
     std::string loggerUsage;
 }
@@ -63,12 +64,17 @@ std::string Logger::usage()
 
 void Logger::configure(int argc, char* argv[], const string& pre)
 {
-    bool logToStdout;
-    bool logToStderr;
+    bool logToStdout = false;
+    bool logToStderr = false;
     string logFile;
     std::vector<std::string> selectors;
     std::vector<std::string> deselectors;
-    bool time, level, thread, source, function, hiresTs;
+    bool time = false;
+    bool level = false;
+    bool thread = false;
+    bool source = false;
+    bool function = false;
+    bool hiresTs = false;
 
     selectors.push_back("notice+");
 
