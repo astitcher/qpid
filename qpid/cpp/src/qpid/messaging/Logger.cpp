@@ -76,7 +76,7 @@ void Logger::configure(int argc, char* argv[], const string& pre)
     bool function = false;
     bool hiresTs = false;
 
-    selectors.push_back("notice+");
+    selectors.push_back("notice+"); // Set this for the usage message default
 
     string prefix = pre.empty() ? pre : pre+"-";
     qpid::Options myOptions;
@@ -127,9 +127,14 @@ void Logger::configure(int argc, char* argv[], const string& pre)
 
     loggerUsage=loggerSStream.str();
 
+    selectors.clear(); // Clear to give passed in options precedence
+
     // Parse the command line not failing for unrecognised options
     myOptions.parse(argc, argv, std::string(), true);
 
+    // If no passed in enable or disable log specification then go back to default
+    if (selectors.empty() && deselectors.empty())
+        selectors.push_back("notice+");
     // Set the logger options according to what we just parsed
     qpid::log::Options logOptions;
     logOptions.selectors = selectors;
