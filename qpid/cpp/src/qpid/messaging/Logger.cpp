@@ -135,8 +135,6 @@ void Logger::configure(int argc, const char* argv[], const string& pre)
     // If no passed in enable or disable log specification then go back to default
     if (selectors.empty() && deselectors.empty())
         selectors.push_back("notice+");
-    else
-        selectors.push_back("critical"); // Always get critical notices
     // Set the logger options according to what we just parsed
     qpid::log::Options logOptions;
     logOptions.selectors = selectors;

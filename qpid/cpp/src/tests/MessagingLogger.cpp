@@ -52,25 +52,44 @@ public:
     {}
 };
 
+#define SETUP_LOGGING(logger, ...) \
+do {\
+    const char* args[]={"", __VA_ARGS__, 0};\
+    qpid::messaging::Logger::configure((sizeof (args)/sizeof (char*))-1, args);\
+    logOutput.clear();\
+    qpid::messaging::Logger::setOutput(logger);\
+} while (0)
+#define LOG_ALL_LOGGING_LEVELS \
+do { \
+    QPID_LOG(trace, "trace level output"); \
+    QPID_LOG(debug, "debug level output"); \
+    QPID_LOG(info, "info level output"); \
+    QPID_LOG(notice, "notice level output"); \
+    QPID_LOG(warning, "warning level output"); \
+    QPID_LOG(critical, "critical level output"); \
+} while (0)
 
 std::string logOutput;
 
-QPID_AUTO_TEST_CASE(testLogger)
+QPID_AUTO_TEST_CASE(testLoggerLevels)
 {
     StringLogger logger(logOutput);
 
-    const char* args[]={"", "--log-enable", "debug", 0};
-    qpid::messaging::Logger::configure(3, args);
-    logOutput.clear();
-    qpid::messaging::Logger::setOutput(logger);
-    QPID_LOG(trace, "trace level output");
-    QPID_LOG(debug, "debug level output");
-    QPID_LOG(info, "info level output");
-    QPID_LOG(notice, "notice level output");
-    QPID_LOG(warning, "warning level output");
-    QPID_LOG(critical, "critical level output");
-
+    SETUP_LOGGING(logger, "--log-enable", "debug");
+    LOG_ALL_LOGGING_LEVELS;
     BOOST_CHECK_EQUAL(logOutput, "debug level output\ncritical level output\n");
+
+    SETUP_LOGGING(logger, "--log-enable", "trace+", "--log-disable", "notice");
+    LOG_ALL_LOGGING_LEVELS;
+    BOOST_CHECK_EQUAL(logOutput, "trace level output\ndebug level output\ninfo level output\nwarning level output\ncritical level output\n");
+
+    SETUP_LOGGING(logger, "--log-enable", "info-");
+    LOG_ALL_LOGGING_LEVELS;
+    BOOST_CHECK_EQUAL(logOutput, "trace level output\ndebug level output\ninfo level output\ncritical level output\n");
+
+    SETUP_LOGGING(logger, "--log-enable", "trace+", "--log-disable", "notice+");
+    LOG_ALL_LOGGING_LEVELS;
+    BOOST_CHECK_EQUAL(logOutput, "trace level output\ndebug level output\ninfo level output\ncritical level output\n");
 }
 
 QPID_AUTO_TEST_SUITE_END()
