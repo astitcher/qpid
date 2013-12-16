@@ -103,7 +103,7 @@ public:
      * @param argv array of pointers to options - indentical to meaning for main().
      * @param prefix (optional) If present prefix all logging options with this string
      */
-    QPID_MESSAGING_EXTERN static void configure(int argc, char* argv[], const std::string& prefix=std::string());
+    QPID_MESSAGING_EXTERN static void configure(int argc, const char* argv[], const std::string& prefix=std::string());
 
     /**
      * Get a user friendly usage message.

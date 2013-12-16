@@ -175,6 +175,7 @@ set(all_unit_tests
     ManagementTest
     MessageReplayTracker
     MessageTest
+    MessagingLogger
     MessagingSessionTests
     PollableCondition
     ProxyTest
@@ -289,8 +290,8 @@ add_executable (msg_group_test msg_group_test.cpp ${platform_test_additions})
 target_link_libraries (msg_group_test qpidmessaging qpidtypes qpidcommon "${Boost_PROGRAM_OPTIONS_LIBRARY}")
 remember_location(msg_group_test)
 
-add_executable (MessagingLogger MessagingLogger.cpp ${platform_test_additions})
-target_link_libraries (MessagingLogger qpidmessaging qpidtypes "${Boost_PROGRAM_OPTIONS_LIBRARY}")
+#add_executable (MessagingLogger MessagingLogger.cpp ${platform_test_additions})
+#target_link_libraries (MessagingLogger qpidmessaging qpidtypes "${Boost_PROGRAM_OPTIONS_LIBRARY}")
 
 if (BUILD_SASL)
     add_executable (sasl_version sasl_version.cpp ${platform_test_additions})

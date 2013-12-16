@@ -19,14 +19,67 @@
  *
  */
 
-#include <qpid/messaging/Connection.h>
-#include <qpid/messaging/Logger.h>
+#include "qpid/log/Statement.h"
+#include "qpid/messaging/Connection.h"
+#include "qpid/messaging/Logger.h"
 
 #include <iostream>
 #include <memory>
 #include <stdexcept>
 
 #include <vector>
+
+#define UNIT_TEST
+#ifdef UNIT_TEST
+
+#include "unit_test.h"
+
+namespace qpid {
+namespace tests {
+
+QPID_AUTO_TEST_SUITE(MessagingLoggerSuite)
+
+class StringLogger : public qpid::messaging::LoggerOutput {
+    std::string& outString;
+
+    void log(qpid::messaging::Level /*level*/, const char* /*file*/, int /*line*/, const char* /*function*/, const std::string& message){
+        outString += message;
+    }
+
+public:
+    StringLogger(std::string& os) :
+        outString(os)
+    {}
+};
+
+
+std::string logOutput;
+
+QPID_AUTO_TEST_CASE(testLogger)
+{
+    StringLogger logger(logOutput);
+
+    const char* args[]={"", "--log-enable", "debug", 0};
+    qpid::messaging::Logger::configure(3, args);
+    logOutput.clear();
+    qpid::messaging::Logger::setOutput(logger);
+    QPID_LOG(trace, "trace level output");
+    QPID_LOG(debug, "debug level output");
+    QPID_LOG(info, "info level output");
+    QPID_LOG(notice, "notice level output");
+    QPID_LOG(warning, "warning level output");
+    QPID_LOG(critical, "critical level output");
+
+    BOOST_CHECK_EQUAL(logOutput, "debug level output\ncritical level output\n");
+}
+
+QPID_AUTO_TEST_SUITE_END()
+}}
+
+#else
+
+namespace qpid {
+namespace tests {
 
 class MyLogger : public qpid::messaging::LoggerOutput {
     std::ostream& outStream;
@@ -74,4 +127,13 @@ int main(int argc, char* argv[]) {
     } catch (std::exception& e) {
         qpid::messaging::Logger::log(qpid::messaging::critical, __FILE__, __LINE__, __FUNCTION__  , std::string("Caught exception: ") + e.what());
     }
+
+    return 0;
 }
+
+}}
+
+int main(int argc, char* argv[]) {
+    return qpid::tests::main(argc, argv);
+}
+#endif
