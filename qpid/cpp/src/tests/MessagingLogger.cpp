@@ -30,9 +30,6 @@
 
 #include <vector>
 
-#define UNIT_TEST
-#ifdef UNIT_TEST
-
 #include "unit_test.h"
 
 namespace qpid {
@@ -149,65 +146,3 @@ QPID_AUTO_TEST_CASE(testLoggerException)
 
 QPID_AUTO_TEST_SUITE_END()
 }}
-
-#else
-
-namespace qpid {
-namespace tests {
-
-class MyLogger : public qpid::messaging::LoggerOutput {
-    std::ostream& outStream;
-
-    void log(qpid::messaging::Level /*level*/, const char* file, int line, const char* function, const std::string& message){
-        outStream << file << ":" << line << ":["<< function << "()]:"  << message;
-    }
-
-public:
-    MyLogger(std::ostream& os) :
-        outStream(os)
-    {}
-};
-
-std::string UsageOption("--help");
-
-int main(int argc, const char* argv[]) {
-    std::vector<const char*> args(&argv[0], &argv[argc]);
-
-    bool showUsage = false;
-    for (int i=0; i<argc; ++i){
-        if ( UsageOption == args[i] ) showUsage = true;
-    }
-
-    try {
-        qpid::messaging::Logger::configure(argc, argv, "qpid");
-    } catch (std::exception& e) {
-        std::cerr << "Caught exception configuring logger: " << e.what() << "\n";
-        showUsage = true;
-    }
-
-    try {
-        if (showUsage) {
-            std::cerr << qpid::messaging::Logger::usage();
-            return 0;
-        }
-
-        MyLogger logger(std::cout);
-        qpid::messaging::Logger::setOutput(logger);
-
-        using qpid::messaging::Connection;
-        Connection c("localhost");
-
-        c.open();
-    } catch (std::exception& e) {
-        qpid::messaging::Logger::log(qpid::messaging::critical, __FILE__, __LINE__, __FUNCTION__  , std::string("Caught exception: ") + e.what());
-    }
-
-    return 0;
-}
-
-}}
-
-int main(int argc, const char* argv[]) {
-    return qpid::tests::main(argc, argv);
-}
-#endif
