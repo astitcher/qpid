@@ -42,9 +42,9 @@ macro(remember_location testname)
   set (${testname}_LOCATION ${CMAKE_CURRENT_BINARY_DIR}/${testname}${CMAKE_EXECUTABLE_SUFFIX})
 endmacro(remember_location)
 
-# If we're using GCC allow variadic macros (even though they're c99 not c++01
+# If we're using GCC allow variadic macros (even though they're c99 not c++01)
 if (CMAKE_COMPILER_IS_GNUCXX)
-  add_compile_options(-Wno-variadic-macros)
+  add_definitions(-Wno-variadic-macros)
 endif (CMAKE_COMPILER_IS_GNUCXX)
 
 # Windows uses some process-startup calls to ensure that errors, etc. don't

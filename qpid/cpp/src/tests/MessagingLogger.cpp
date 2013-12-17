@@ -21,6 +21,7 @@
 
 #include "qpid/log/Statement.h"
 #include "qpid/messaging/Connection.h"
+#include "qpid/messaging/exceptions.h"
 #include "qpid/messaging/Logger.h"
 
 #include <iostream>
@@ -59,14 +60,27 @@ do {\
     logOutput.clear();\
     qpid::messaging::Logger::setOutput(logger);\
 } while (0)
+#define LOG_LEVEL(level)\
+    QPID_LOG(level, #level " level output")
 #define LOG_ALL_LOGGING_LEVELS \
 do { \
-    QPID_LOG(trace, "trace level output"); \
-    QPID_LOG(debug, "debug level output"); \
-    QPID_LOG(info, "info level output"); \
-    QPID_LOG(notice, "notice level output"); \
-    QPID_LOG(warning, "warning level output"); \
-    QPID_LOG(critical, "critical level output"); \
+    LOG_LEVEL(trace); \
+    LOG_LEVEL(debug); \
+    LOG_LEVEL(info); \
+    LOG_LEVEL(notice); \
+    LOG_LEVEL(warning); \
+    LOG_LEVEL(critical); \
+} while (0)
+#define LOG_USER_LEVEL(level)\
+    qpid::messaging::Logger::log(qpid::messaging::level, __FILE__, __LINE__, __FUNCTION__, "User " #level " message")
+#define LOG_ALL_USER_LOGGING_LEVELS \
+do { \
+    LOG_USER_LEVEL(trace); \
+    LOG_USER_LEVEL(debug); \
+    LOG_USER_LEVEL(info); \
+    LOG_USER_LEVEL(notice); \
+    LOG_USER_LEVEL(warning); \
+    LOG_USER_LEVEL(critical); \
 } while (0)
 
 std::string logOutput;
@@ -92,6 +106,47 @@ QPID_AUTO_TEST_CASE(testLoggerLevels)
     BOOST_CHECK_EQUAL(logOutput, "trace level output\ndebug level output\ninfo level output\ncritical level output\n");
 }
 
+QPID_AUTO_TEST_CASE(testUserLoggerLevels)
+{
+    StringLogger logger(logOutput);
+
+    SETUP_LOGGING(logger, "--log-enable", "debug");
+    LOG_ALL_USER_LOGGING_LEVELS;
+    BOOST_CHECK_EQUAL(logOutput, "User debug message\nUser critical message\n");
+
+    SETUP_LOGGING(logger, "--log-enable", "trace+", "--log-disable", "notice");
+    LOG_ALL_USER_LOGGING_LEVELS;
+    BOOST_CHECK_EQUAL(logOutput, "User trace message\nUser debug message\nUser info message\nUser warning message\nUser critical message\n");
+
+    SETUP_LOGGING(logger, "--log-enable", "info-");
+    LOG_ALL_USER_LOGGING_LEVELS;
+    BOOST_CHECK_EQUAL(logOutput, "User trace message\nUser debug message\nUser info message\nUser critical message\n");
+
+    SETUP_LOGGING(logger, "--log-enable", "trace+", "--log-disable", "notice+");
+    LOG_ALL_USER_LOGGING_LEVELS;
+    BOOST_CHECK_EQUAL(logOutput, "User trace message\nUser debug message\nUser info message\nUser critical message\n");
+
+    SETUP_LOGGING(logger, "--log-disable", "trace+");
+    LOG_ALL_LOGGING_LEVELS;
+    LOG_ALL_USER_LOGGING_LEVELS;
+    BOOST_CHECK_EQUAL(logOutput, "critical level output\nUser critical message\n");
+}
+
+QPID_AUTO_TEST_CASE(testLoggerUsage)
+{
+    qpid::messaging::Logger::configure(0, 0, "blah");
+    std::string u = qpid::messaging::Logger::usage();
+
+    BOOST_CHECK(!u.empty());
+    BOOST_CHECK( u.find("--blah-log-enable")!=u.npos );
+}
+
+QPID_AUTO_TEST_CASE(testLoggerException)
+{
+    const char* args[]={"", "--blah-log-enable", "illegal", 0};
+    BOOST_CHECK_THROW(qpid::messaging::Logger::configure(3, args, "blah"), qpid::messaging::MessagingException);
+}
+
 QPID_AUTO_TEST_SUITE_END()
 }}
 
@@ -115,7 +170,7 @@ public:
 
 std::string UsageOption("--help");
 
-int main(int argc, char* argv[]) {
+int main(int argc, const char* argv[]) {
     std::vector<const char*> args(&argv[0], &argv[argc]);
 
     bool showUsage = false;
@@ -152,7 +207,7 @@ int main(int argc, char* argv[]) {
 
 }}
 
-int main(int argc, char* argv[]) {
+int main(int argc, const char* argv[]) {
     return qpid::tests::main(argc, argv);
 }
 #endif

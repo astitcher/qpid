@@ -23,6 +23,7 @@
 
 #include "qpid/log/Logger.h"
 #include "qpid/log/OstreamOutput.h"
+#include "qpid/messaging/exceptions.h"
 
 #include <sstream>
 #include <string>
@@ -55,6 +56,7 @@ inline qpid::log::Logger& logger() {
 
 namespace {
     std::string loggerUsage;
+    qpid::log::Selector loggerSelector;
 }
 
 std::string Logger::usage()
@@ -63,6 +65,7 @@ std::string Logger::usage()
 }
 
 void Logger::configure(int argc, const char* argv[], const string& pre)
+try
 {
     bool logToStdout = false;
     bool logToStderr = false;
@@ -147,9 +150,10 @@ void Logger::configure(int argc, const char* argv[], const string& pre)
     logOptions.function = function;
     logOptions.hiresTs = hiresTs;
 
+    loggerSelector = qpid::log::Selector(logOptions);
     logger().clear(); // Need to clear before configuring as it will have been initialised statically already
     logger().format(logOptions);
-    logger().select(qpid::log::Selector(logOptions));
+    logger().select(loggerSelector);
 
     // Have to set up the standard output sinks manually
     if (logToStderr)
@@ -163,6 +167,10 @@ void Logger::configure(int argc, const char* argv[], const string& pre)
         logger().output(std::auto_ptr<qpid::log::Logger::Output>
                          (new qpid::log::OstreamOutput(logFile)));
 }
+catch (std::exception& e)
+{
+    throw MessagingException(e.what());
+}
 
 void Logger::setOutput(LoggerOutput& o)
 {
@@ -171,15 +179,17 @@ void Logger::setOutput(LoggerOutput& o)
 
 void Logger::log(Level level, const char* file, int line, const char* function, const string& message)
 {
-    qpid::log::Statement s = {
-        true,
-        file,
-        line,
-        function,
-        qpid::log::Level(level),
-        qpid::log::unspecified,
-    };
-    logger().log(s, message);
+    if (loggerSelector.isEnabled(qpid::log::Level(level), function, qpid::log::unspecified)) {
+        qpid::log::Statement s = {
+            true,
+            file,
+            line,
+            function,
+            qpid::log::Level(level),
+            qpid::log::unspecified,
+        };
+        logger().log(s, message);
+    }
 }
 
 }} // namespace qpid::messaging

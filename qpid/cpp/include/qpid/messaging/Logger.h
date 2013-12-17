@@ -99,9 +99,10 @@ public:
      *
      * These options control what information is included in the logging message sent by the logging subsystem.
      *
-     * @param argc count of options - indentical to meaning for main().
-     * @param argv array of pointers to options - indentical to meaning for main().
+     * @param argc count of options - identical to meaning for main().
+     * @param argv array of pointers to options - identical to meaning for main().
      * @param prefix (optional) If present prefix all logging options with this string
+     * @throws MessagingException if it cannot parse an option it recognises
      */
     QPID_MESSAGING_EXTERN static void configure(int argc, const char* argv[], const std::string& prefix=std::string());
 
