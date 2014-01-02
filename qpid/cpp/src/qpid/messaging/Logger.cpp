@@ -49,6 +49,10 @@ public:
     {}
 };
 
+LoggerOutput::~LoggerOutput()
+{
+}
+
 inline qpid::log::Logger& logger() {
     static qpid::log::Logger& theLogger=qpid::log::Logger::instance();
     return theLogger;

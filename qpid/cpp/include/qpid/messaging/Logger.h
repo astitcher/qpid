@@ -41,6 +41,8 @@ enum Level { trace, debug, info, notice, warning, error, critical };
 class QPID_MESSAGING_CLASS_EXTERN LoggerOutput
 {
 public:
+    virtual ~LoggerOutput();
+
     /**
      * Override this member function to receive log messages.
      *
@@ -80,12 +82,12 @@ public:
      *
      * RULE is in the form LEVEL[("+"|"-")][:PATTERN]
      * LEVEL is one of "trace", "debug", "info", "notice", "warning", "error", "critical"
-     * "+" turns the level and all higher levels on
-     * "-" turns the level and all lower levels on
+     * "+" operates on the level and all higher levels
+     * "-" operates on the level and all lower levels
      * PATTERN is a category name or a fragment of a fully namespace qualified function (Case sensitive).
      *
      * --log-to-stdout ("on"|"off|"0"|"1")
-     * --log-to-stdout ("on"|"off|"0"|"1")
+     * --log-to-stderr ("on"|"off|"0"|"1")
      * --log-to-file FILENAME
      *
      * These options control where the qpid logging subsystem sends log messages
