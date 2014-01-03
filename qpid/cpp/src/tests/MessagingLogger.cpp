@@ -40,7 +40,8 @@ QPID_AUTO_TEST_SUITE(MessagingLoggerSuite)
 class StringLogger : public qpid::messaging::LoggerOutput {
     std::string& outString;
 
-    void log(qpid::messaging::Level /*level*/, const char* /*file*/, int /*line*/, const char* /*function*/, const std::string& message){
+    void log(qpid::messaging::Level /*level*/, bool user, const char* /*file*/, int /*line*/, const char* /*function*/, const std::string& message){
+        if (user) outString += "User ";
         outString += message;
     }
 
@@ -69,7 +70,7 @@ do { \
     LOG_LEVEL(critical); \
 } while (0)
 #define LOG_USER_LEVEL(level)\
-    qpid::messaging::Logger::log(qpid::messaging::level, __FILE__, __LINE__, __FUNCTION__, "User " #level " message")
+    qpid::messaging::Logger::log(qpid::messaging::level, __FILE__, __LINE__, __FUNCTION__, #level " message")
 #define LOG_ALL_USER_LOGGING_LEVELS \
 do { \
     LOG_USER_LEVEL(trace); \

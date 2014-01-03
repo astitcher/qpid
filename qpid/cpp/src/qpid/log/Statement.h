@@ -71,11 +71,12 @@ struct LevelTraits {
  * Store       store
  * Network     tcp rdma AsynchIO socket epoll
  * Test
+ * User        <No broker directory - signifies log message from library user code>
  * Model       <not related to a directory>
  * Unspecified <must be last in enum>
  */
 enum Category { security, broker, management, protocol, system, ha, messaging,
-    store, network, test, client, model, unspecified };
+    store, network, test, client, user, model, unspecified };
 struct CategoryTraits {
     static const int COUNT=unspecified+1;
 

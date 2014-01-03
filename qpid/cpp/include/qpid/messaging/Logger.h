@@ -51,7 +51,7 @@ public:
      *
      * The logging subsystem ensures that log() will not be called simultaneously in different threads.
      */
-    virtual void log(Level level, const char* file, int line, const char* function, const std::string& message) = 0;
+    virtual void log(Level level, bool user, const char* file, int line, const char* function, const std::string& message) = 0;
 };
 
 /** \ingroup messaging
