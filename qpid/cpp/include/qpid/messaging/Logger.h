@@ -50,6 +50,14 @@ public:
      * logging subsystem after applying the specified logging filters.
      *
      * The logging subsystem ensures that log() will not be called simultaneously in different threads.
+     * @param level The severity of the log message can be (in order of severity)
+     *                trace, debug, info, notice, warning, error, critical
+     * @param user Flag which is set if the log message came from the user application ( using qpid::messaging::Logger::log() )
+     *              (if not set then the message comes from the qpid library)
+     * @param file The source code file name reported as the origin of the log message
+     * @param line The source code line number reported as the origin of the log message
+     * @param function The source code function reported as the origin of the log message
+     * @param message The log message
      */
     virtual void log(Level level, bool user, const char* file, int line, const char* function, const std::string& message) = 0;
 };
@@ -139,6 +147,8 @@ public:
      * Output a log message. This will get sent to all the specified logging outputs including any
      * the application has registered. The message will get filtered along with the internal messages
      * according to the specified logging filters.
+     *
+     * When a log message output using log() is received by a LoggerOutput::log() method the "user" bool parameter will be set true.
      */
     QPID_MESSAGING_EXTERN static void log(Level level, const char* file, int line, const char* function, const std::string& message);
 

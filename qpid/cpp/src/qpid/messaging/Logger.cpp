@@ -40,7 +40,7 @@ class ProxyOutput : public qpid::log::Logger::Output {
     LoggerOutput& output;
 
     void log(const qpid::log::Statement& s, const string& message) {
-        output.log(qpid::messaging::Level(s.level), s.category==qpid::log::user, s.file, s.line, s.function, message);
+        output.log(qpid::messaging::Level(s.level), s.category==qpid::log::external_application, s.file, s.line, s.function, message);
     }
 
 public:
@@ -190,7 +190,7 @@ void Logger::log(Level level, const char* file, int line, const char* function, 
             line,
             function,
             qpid::log::Level(level),
-            qpid::log::user,
+            qpid::log::external_application,
         };
         logger().log(s, message);
     }
