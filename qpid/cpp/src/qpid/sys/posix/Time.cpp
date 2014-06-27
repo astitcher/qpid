@@ -53,7 +53,7 @@ AbsTime AbsTime::FarFuture() {
 
 AbsTime AbsTime::now() {
     struct timespec ts;
-    ::clock_gettime(CLOCK_REALTIME, &ts);
+    ::clock_gettime(CLOCK_MONOTONIC, &ts);
     AbsTime time_now;
     time_now.timepoint = toTime(ts).nanosecs;
     return time_now;

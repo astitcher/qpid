@@ -52,7 +52,10 @@ class Condition
 };
 
 Condition::Condition() {
-    QPID_POSIX_ASSERT_THROW_IF(pthread_cond_init(&condition, 0));
+    pthread_condattr_t condattr;
+    QPID_POSIX_ASSERT_THROW_IF(pthread_condattr_init(&condattr));
+    QPID_POSIX_ASSERT_THROW_IF(pthread_condattr_setclock(&condattr, CLOCK_MONOTONIC));
+    QPID_POSIX_ASSERT_THROW_IF(pthread_cond_init(&condition, &condattr));
 }
 
 Condition::~Condition() {
