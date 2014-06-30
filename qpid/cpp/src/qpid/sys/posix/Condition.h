@@ -40,33 +40,26 @@ namespace sys {
 class Condition
 {
   public:
-    inline Condition();
-    inline ~Condition();
-    inline void wait(Mutex&);
-    inline bool wait(Mutex&, const AbsTime& absoluteTime);
-    inline void notify();
-    inline void notifyAll();
+    Condition();
+    ~Condition();
+    void wait(Mutex&);
+    bool wait(Mutex&, const AbsTime& absoluteTime);
+    void notify();
+    void notifyAll();
 
   private:
     pthread_cond_t condition;
 };
 
-Condition::Condition() {
-    pthread_condattr_t condattr;
-    QPID_POSIX_ASSERT_THROW_IF(pthread_condattr_init(&condattr));
-    QPID_POSIX_ASSERT_THROW_IF(pthread_condattr_setclock(&condattr, CLOCK_MONOTONIC));
-    QPID_POSIX_ASSERT_THROW_IF(pthread_cond_init(&condition, &condattr));
-}
-
-Condition::~Condition() {
+inline Condition::~Condition() {
     QPID_POSIX_ABORT_IF(pthread_cond_destroy(&condition));
 }
 
-void Condition::wait(Mutex& mutex) {
+inline void Condition::wait(Mutex& mutex) {
     QPID_POSIX_ASSERT_THROW_IF(pthread_cond_wait(&condition, &mutex.mutex));
 }
 
-bool Condition::wait(Mutex& mutex, const AbsTime& absoluteTime){
+inline bool Condition::wait(Mutex& mutex, const AbsTime& absoluteTime){
     struct timespec ts;
     toTimespec(ts, absoluteTime);
     int status = pthread_cond_timedwait(&condition, &mutex.mutex, &ts);
@@ -77,11 +70,11 @@ bool Condition::wait(Mutex& mutex, const AbsTime& absoluteTime){
     return true;
 }
 
-void Condition::notify(){
+inline void Condition::notify(){
     QPID_POSIX_ASSERT_THROW_IF(pthread_cond_signal(&condition));
 }
 
-void Condition::notifyAll(){
+inline void Condition::notifyAll(){
     QPID_POSIX_ASSERT_THROW_IF(pthread_cond_broadcast(&condition));
 }
 

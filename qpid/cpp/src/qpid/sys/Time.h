@@ -91,8 +91,9 @@ public:
     // Default copy constructor fine
 
     QPID_COMMON_EXTERN static AbsTime now();
+    QPID_COMMON_EXTERN static AbsTime epoch();
     QPID_COMMON_EXTERN static AbsTime FarFuture();
-    QPID_COMMON_EXTERN static AbsTime Epoch();
+    QPID_COMMON_EXTERN static AbsTime Zero();
 
     bool operator==(const AbsTime& t) const { return t.timepoint == timepoint; }
 
@@ -156,6 +157,9 @@ const Duration TIME_NSEC = 1;
 
 /** Value to represent an infinite timeout */
 const Duration TIME_INFINITE = std::numeric_limits<int64_t>::max();
+
+/** Absolute time zero point */
+const AbsTime ZERO = AbsTime::Zero();
 
 /** Time greater than any other time */
 const AbsTime FAR_FUTURE = AbsTime::FarFuture();

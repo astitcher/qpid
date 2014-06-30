@@ -42,7 +42,7 @@ AbsTime::AbsTime(const AbsTime& t, const Duration& d) :
     timepoint(d == Duration::max() ? max_abstime() : t.timepoint+d.nanosecs)
 {}
 
-AbsTime AbsTime::Epoch() {
+AbsTime AbsTime::Zero() {
     AbsTime epoch; epoch.timepoint = 0;
     return epoch;
 }
@@ -57,6 +57,10 @@ AbsTime AbsTime::now() {
     AbsTime time_now;
     time_now.timepoint = toTime(ts).nanosecs;
     return time_now;
+}
+
+AbsTime AbsTime::epoch() {
+    return AbsTime(now(), -Duration::FromEpoch());
 }
 
 Duration Duration::FromEpoch() {
@@ -75,8 +79,7 @@ const time_t TIME_T_MAX = std::numeric_limits<time_t>::max();
 }
 
 struct timespec& toTimespec(struct timespec& ts, const AbsTime& a) {
-    static const AbsTime epoch = AbsTime::Epoch();
-    Duration t = Duration(epoch, a);
+    Duration t(ZERO, a);
     Duration secs = t / TIME_SEC;
     ts.tv_sec = (secs > TIME_T_MAX) ? TIME_T_MAX : static_cast<time_t>(secs);
     ts.tv_nsec = static_cast<long>(t % TIME_SEC);
